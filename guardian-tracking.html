@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>SafeRoute - Guardian Tracking</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              paper: "#ffffff",
+              ink: "#191919",
+              muted: "#6b6b6b",
+              line: "#e8e7e3",
+              soft: "#f7f6f3",
+              accent: "#2f6fed",
+              alert: "#d44b32",
+              success: "#237b4b",
+            },
+            fontFamily: {
+              sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+            },
+            boxShadow: {
+              card: "0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 40px rgba(15, 23, 42, 0.04)",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 24;
+      }
+
+      .map-surface {
+        background:
+          linear-gradient(rgba(25, 25, 25, 0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(25, 25, 25, 0.05) 1px, transparent 1px),
+          linear-gradient(180deg, #faf9f7, #f4f2ed);
+        background-size: 44px 44px, 44px 44px, auto;
+      }
+
+      body {
+        min-height: 100dvh;
+      }
+    </style>
+  </head>
+  <body class="bg-soft font-sans text-ink">
+    <div class="mx-auto min-h-screen max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <header class="mb-6 rounded-2xl border border-line bg-paper px-5 py-4 shadow-card">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div class="flex items-center gap-3">
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-soft">
+              <span class="material-symbols-outlined text-ink" style="font-variation-settings: 'FILL' 1"
+                >shield_with_heart</span
+              >
+            </div>
+            <div>
+              <p class="text-xs font-medium uppercase tracking-[0.2em] text-muted">SafeRoute</p>
+              <h1 class="text-lg font-semibold">Guardian Mode</h1>
+            </div>
+          </div>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <nav class="flex flex-wrap gap-2">
+              <a class="rounded-xl px-3 py-2 text-sm font-medium text-muted transition hover:bg-soft hover:text-ink" href="index.html">Home</a>
+              <a class="rounded-xl px-3 py-2 text-sm font-medium text-muted transition hover:bg-soft hover:text-ink" href="plan-your-journey.html">Routes</a>
+              <a class="rounded-xl px-3 py-2 text-sm font-medium text-muted transition hover:bg-soft hover:text-ink" href="safety-score.html">Safety Score</a>
+              <a class="rounded-xl bg-soft px-3 py-2 text-sm font-medium text-ink" href="guardian-tracking.html">Guardian Mode</a>
+            </nav>
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="inline-flex items-center gap-2 rounded-full bg-soft px-3 py-1.5 text-sm text-muted">
+                <span class="material-symbols-outlined text-base">schedule</span>
+                Live ETA updates
+              </div>
+              <a class="rounded-xl border border-line bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-soft" href="plan-your-journey.html">
+                Share trip
+              </a>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="grid gap-6 lg:grid-cols-[1.45fr_0.85fr]">
+        <section class="space-y-6">
+          <div class="rounded-3xl border border-line bg-paper shadow-card">
+            <div class="border-b border-line px-6 py-5">
+              <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p class="text-sm font-medium text-muted">Tracked trip</p>
+                  <h2 class="mt-1 text-3xl font-semibold tracking-tight">Aarav to City Hospital Gate 2</h2>
+                </div>
+                <div class="inline-flex items-center gap-2 rounded-full border border-line bg-soft px-3 py-1.5 text-sm text-muted">
+                  <span class="material-symbols-outlined text-base text-success">verified</span>
+                  Guardian watching
+                </div>
+              </div>
+            </div>
+
+            <div class="p-6">
+              <div class="map-surface relative h-[520px] overflow-hidden rounded-2xl border border-line">
+                <div class="absolute left-5 top-5 rounded-full border border-line bg-paper px-3 py-1 text-xs font-medium text-muted">
+                  Live map
+                </div>
+
+                <div class="absolute left-[13%] top-[17%] flex items-center gap-2 rounded-xl border border-line bg-paper px-3 py-2 text-sm shadow-sm">
+                  <span class="material-symbols-outlined text-muted">trip_origin</span>
+                  Start
+                </div>
+
+                <div class="absolute left-[18%] top-[22%] h-3 w-3 rounded-full bg-accent"></div>
+                <div class="absolute left-[19%] top-[23%] h-[16%] w-[14%] rounded-[999px] border-[3px] border-accent border-r-transparent border-t-transparent"></div>
+                <div class="absolute left-[31%] top-[36%] h-[12%] w-[12%] rounded-[999px] border-[3px] border-accent border-b-transparent border-l-transparent"></div>
+                <div class="absolute left-[42%] top-[34%] h-[20%] w-[19%] rounded-[999px] border-[3px] border-accent border-r-transparent border-b-transparent"></div>
+                <div class="absolute left-[57%] top-[50%] h-[12%] w-[11%] rounded-[999px] border-[3px] border-accent border-l-transparent border-t-transparent"></div>
+                <div class="absolute left-[66%] top-[57%] h-3 w-3 rounded-full bg-accent"></div>
+
+                <div class="absolute left-[49%] top-[31%] max-w-[240px] rounded-2xl border border-[#f1d2ca] bg-[#fff7f5] px-4 py-3 shadow-sm">
+                  <div class="flex items-start gap-3">
+                    <span class="material-symbols-outlined text-alert" style="font-variation-settings: 'FILL' 1"
+                      >car_crash</span
+                    >
+                    <div>
+                      <p class="text-sm font-semibold text-ink">Accident notification</p>
+                      <p class="mt-1 text-sm leading-6 text-muted">
+                        Minor crash reported 120 m ahead. ETA may increase by 4 minutes if the route stays unchanged.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="absolute left-[69%] top-[60%] rounded-xl border border-line bg-paper px-3 py-2 text-sm shadow-sm">
+                  <p class="font-medium">Destination</p>
+                  <p class="text-muted">City Hospital Gate 2</p>
+                </div>
+
+                <div class="absolute bottom-5 left-5 right-5 grid gap-3 md:grid-cols-4">
+                  <div class="rounded-2xl border border-line bg-paper p-4">
+                    <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted">Started</p>
+                    <p class="mt-2 text-2xl font-semibold">8:03 PM</p>
+                  </div>
+                  <div class="rounded-2xl border border-line bg-paper p-4">
+                    <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted">Time taken</p>
+                    <p class="mt-2 text-2xl font-semibold">27 min</p>
+                  </div>
+                  <div class="rounded-2xl border border-line bg-paper p-4">
+                    <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted">Time left</p>
+                    <p class="mt-2 text-2xl font-semibold text-accent">12 min</p>
+                  </div>
+                  <div class="rounded-2xl border border-line bg-paper p-4">
+                    <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted">Arrival</p>
+                    <p class="mt-2 text-2xl font-semibold">8:42 PM</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid gap-4 md:grid-cols-3">
+            <div class="rounded-2xl border border-line bg-paper p-5 shadow-card">
+              <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-soft">
+                <span class="material-symbols-outlined text-muted">warning</span>
+              </div>
+              <h3 class="mt-4 text-lg font-semibold">Accident alerts on map</h3>
+              <p class="mt-2 text-sm leading-6 text-muted">
+                Incidents appear exactly on the route, with a short explanation and delay estimate.
+              </p>
+            </div>
+            <div class="rounded-2xl border border-line bg-paper p-5 shadow-card">
+              <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-soft">
+                <span class="material-symbols-outlined text-muted">guardian</span>
+              </div>
+              <h3 class="mt-4 text-lg font-semibold">Guardian mode</h3>
+              <p class="mt-2 text-sm leading-6 text-muted">
+                A trusted person can monitor the route, status, and alerts without clutter.
+              </p>
+            </div>
+            <div class="rounded-2xl border border-line bg-paper p-5 shadow-card">
+              <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-soft">
+                <span class="material-symbols-outlined text-muted">schedule</span>
+              </div>
+              <h3 class="mt-4 text-lg font-semibold">Time calculation</h3>
+              <p class="mt-2 text-sm leading-6 text-muted">
+                Time taken so far, remaining time, and final arrival are visible at a glance.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <aside class="space-y-6">
+          <div class="rounded-3xl border border-line bg-paper p-6 shadow-card">
+            <p class="text-xs font-medium uppercase tracking-[0.18em] text-muted">Guardian summary</p>
+            <h3 class="mt-2 text-2xl font-semibold tracking-tight">Trip status is stable</h3>
+            <p class="mt-3 text-sm leading-7 text-muted">
+              Aarav is moving on the planned route. One accident alert is active, but the guardian can still see a safe
+              alternate option.
+            </p>
+
+            <div class="mt-6 space-y-3">
+              <div class="flex items-center justify-between rounded-2xl bg-soft px-4 py-3">
+                <span class="text-sm text-muted">Current speed</span>
+                <span class="text-sm font-medium text-ink">22 km/h</span>
+              </div>
+              <div class="flex items-center justify-between rounded-2xl bg-soft px-4 py-3">
+                <span class="text-sm text-muted">Distance remaining</span>
+                <span class="text-sm font-medium text-ink">2.8 km</span>
+              </div>
+              <div class="flex items-center justify-between rounded-2xl bg-soft px-4 py-3">
+                <span class="text-sm text-muted">Route deviation</span>
+                <span class="text-sm font-medium text-success">No deviation</span>
+              </div>
+            </div>
+
+            <div class="mt-6 flex gap-3">
+              <a class="flex-1 rounded-xl bg-ink px-4 py-3 text-center text-sm font-medium text-white transition hover:opacity-90" href="plan-your-journey.html">
+                Call traveler
+              </a>
+              <a class="rounded-xl border border-line bg-paper px-4 py-3 text-sm font-medium text-ink transition hover:bg-soft" href="index.html">
+                Message
+              </a>
+            </div>
+          </div>
+
+          <div class="rounded-3xl border border-line bg-paper p-6 shadow-card">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-xs font-medium uppercase tracking-[0.18em] text-muted">Live alerts</p>
+                <h3 class="mt-2 text-xl font-semibold">Current notifications</h3>
+              </div>
+              <span class="rounded-full bg-soft px-3 py-1 text-xs font-medium text-muted">2 active</span>
+            </div>
+
+            <div class="mt-5 space-y-4">
+              <div class="rounded-2xl border border-line p-4">
+                <div class="flex items-start gap-3">
+                  <span class="material-symbols-outlined text-alert" style="font-variation-settings: 'FILL' 1"
+                    >notification_important</span
+                  >
+                  <div>
+                    <p class="text-sm font-semibold">Accident ahead</p>
+                    <p class="mt-1 text-sm leading-6 text-muted">
+                      Crash near Richmond Circle. The app recalculated arrival from 8:38 PM to 8:42 PM.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div class="rounded-2xl border border-line p-4">
+                <div class="flex items-start gap-3">
+                  <span class="material-symbols-outlined text-accent" style="font-variation-settings: 'FILL' 1"
+                    >alt_route</span
+                  >
+                  <div>
+                    <p class="text-sm font-semibold">Alternate route available</p>
+                    <p class="mt-1 text-sm leading-6 text-muted">
+                      Adds 3 minutes but avoids the blocked road section and keeps trip tracking uninterrupted.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded-3xl border border-line bg-paper p-6 shadow-card">
+            <p class="text-xs font-medium uppercase tracking-[0.18em] text-muted">Guardian actions</p>
+            <div class="mt-5 space-y-3">
+              <a class="flex w-full items-center justify-between rounded-2xl border border-line px-4 py-3 text-left transition hover:bg-soft" href="safety-score.html">
+                <span class="text-sm font-medium">Open full trip history</span>
+                <span class="material-symbols-outlined text-muted">arrow_forward</span>
+              </a>
+              <a class="flex w-full items-center justify-between rounded-2xl border border-line px-4 py-3 text-left transition hover:bg-soft" href="plan-your-journey.html">
+                <span class="text-sm font-medium">Escalate to emergency contact</span>
+                <span class="material-symbols-outlined text-muted">arrow_forward</span>
+              </a>
+            </div>
+          </div>
+        </aside>
+      </main>
+    </div>
+  </body>
+</html>
