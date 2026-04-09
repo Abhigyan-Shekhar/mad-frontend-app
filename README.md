@@ -9,6 +9,14 @@ This folder contains a small linked prototype for SafeRoute built as standalone 
 - `safety-score.html`: safety score dashboard
 - `guardian-tracking.html`: live trip tracking and guardian mode
 
+## Key Features
+
+- Safer route comparison
+- Safety score based on potholes, roadlights, and theft
+- Guardian mode with live trip tracking
+- Accident notifications on the route
+- SOS deadzone warning for long stretches with poor or zero cellular coverage
+
 ## Navigation Flow
 
 - `index.html` links into route planning and guardian mode.
@@ -17,6 +25,16 @@ This folder contains a small linked prototype for SafeRoute built as standalone 
 - `guardian-tracking.html` links back across the rest of the flow.
 
 Each page also includes a shared top navigation bar so you can move between all screens directly.
+
+## Cellular Deadzone Warning
+
+The prototype now includes a frontend concept for a cellular coverage risk layer:
+
+- Faster routes can be flagged if they enter a long no-service stretch.
+- Slower routes can be preferred when they preserve full SOS coverage.
+- Guardian mode surfaces the deadzone warning during live trip tracking.
+
+This is intended to represent a future integration with route-coordinate analysis and cell tower density data.
 
 ## Run
 

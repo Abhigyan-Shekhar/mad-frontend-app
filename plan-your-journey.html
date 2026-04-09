@@ -111,6 +111,20 @@
               </a>
             </div>
           </div>
+
+          <div class="mt-5 rounded-2xl border border-line bg-soft p-4">
+            <div class="flex items-start gap-3">
+              <span class="material-symbols-outlined mt-0.5 text-muted" style="font-variation-settings: 'FILL' 1"
+                >cell_tower</span
+              >
+              <div>
+                <p class="text-sm font-semibold">SOS deadzone detection enabled</p>
+                <p class="mt-1 text-sm leading-6 text-muted">
+                  Routes are checked for cellular tower density so long no-service stretches can be flagged before you start driving.
+                </p>
+              </div>
+            </div>
+          </div>
         </section>
 
         <section class="grid gap-5 lg:grid-cols-3">
@@ -131,9 +145,15 @@
                 <p class="mt-2 text-xl font-semibold">18 min</p>
               </div>
               <div class="rounded-2xl bg-soft p-4">
-                <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted">Delay</p>
-                <p class="mt-2 text-xl font-semibold">+4 min</p>
+                <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted">SOS coverage</p>
+                <p class="mt-2 text-xl font-semibold">Full</p>
               </div>
+            </div>
+            <div class="mt-4 rounded-2xl border border-line p-4">
+              <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted">Deadzone status</p>
+              <p class="mt-2 text-sm leading-6 text-muted">
+                No zero-service stretch detected. Better option for emergencies and night driving.
+              </p>
             </div>
             <div class="mt-6 overflow-hidden rounded-2xl border border-line">
               <img
@@ -161,9 +181,15 @@
                 <p class="mt-2 text-xl font-semibold">15 min</p>
               </div>
               <div class="rounded-2xl bg-soft p-4">
-                <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted">Delay</p>
-                <p class="mt-2 text-xl font-semibold">+1 min</p>
+                <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted">SOS coverage</p>
+                <p class="mt-2 text-xl font-semibold">Partial</p>
               </div>
+            </div>
+            <div class="mt-4 rounded-2xl border border-line p-4">
+              <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted">Deadzone status</p>
+              <p class="mt-2 text-sm leading-6 text-muted">
+                One 6-mile weak-signal segment detected. Acceptable in city traffic, less ideal for emergencies.
+              </p>
             </div>
             <div class="mt-6 overflow-hidden rounded-2xl border border-line">
               <img
@@ -180,7 +206,7 @@
                 <p class="text-xs font-medium uppercase tracking-[0.18em] text-muted">Fastest</p>
                 <h2 class="mt-2 text-2xl font-semibold">Direct Route</h2>
               </div>
-              <span class="rounded-full bg-[#fff7f5] px-3 py-1 text-sm font-medium text-alert">Safety 61</span>
+              <span class="rounded-full bg-soft px-3 py-1 text-sm font-medium text-muted">Safety 61</span>
             </div>
             <p class="mt-4 text-sm leading-7 text-muted">
               Shortest travel time, but lower lighting and multiple high-risk segments reduce confidence.
@@ -191,9 +217,18 @@
                 <p class="mt-2 text-xl font-semibold">14 min</p>
               </div>
               <div class="rounded-2xl bg-soft p-4">
-                <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted">Delay</p>
-                <p class="mt-2 text-xl font-semibold">0 min</p>
+                <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted">SOS coverage</p>
+                <p class="mt-2 text-xl font-semibold">Deadzone</p>
               </div>
+            </div>
+            <div class="mt-4 rounded-2xl border border-line bg-soft p-4">
+              <div class="flex items-center gap-2">
+                <span class="h-2 w-2 rounded-full bg-alert"></span>
+                <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted">SOS deadzone warning</p>
+              </div>
+              <p class="mt-2 text-sm leading-6 text-muted">
+                Route A is faster, but it includes a 30-mile no-service stretch. Emergency calling may be unavailable.
+              </p>
             </div>
             <div class="mt-6 overflow-hidden rounded-2xl border border-line">
               <img
@@ -210,6 +245,9 @@
             <div>
               <p class="text-sm font-medium text-muted">Selected route summary</p>
               <h3 class="mt-1 text-2xl font-semibold">Well-lit Streets is the safest option tonight.</h3>
+              <p class="mt-2 text-sm leading-6 text-muted">
+                It is slower than the fastest route, but it keeps full SOS coverage the entire way.
+              </p>
             </div>
             <div class="flex gap-3">
               <a class="rounded-xl border border-line bg-paper px-4 py-3 text-sm font-medium text-ink transition hover:bg-soft" href="guardian-tracking.html">

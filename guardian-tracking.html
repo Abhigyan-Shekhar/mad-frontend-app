@@ -124,15 +124,29 @@
                 <div class="absolute left-[57%] top-[50%] h-[12%] w-[11%] rounded-[999px] border-[3px] border-accent border-l-transparent border-t-transparent"></div>
                 <div class="absolute left-[66%] top-[57%] h-3 w-3 rounded-full bg-accent"></div>
 
-                <div class="absolute left-[49%] top-[31%] max-w-[240px] rounded-2xl border border-[#f1d2ca] bg-[#fff7f5] px-4 py-3 shadow-sm">
+                <div class="absolute left-[49%] top-[31%] max-w-[240px] rounded-2xl border border-line bg-paper px-4 py-3 shadow-sm">
                   <div class="flex items-start gap-3">
-                    <span class="material-symbols-outlined text-alert" style="font-variation-settings: 'FILL' 1"
+                    <span class="material-symbols-outlined text-muted" style="font-variation-settings: 'FILL' 1"
                       >car_crash</span
                     >
                     <div>
                       <p class="text-sm font-semibold text-ink">Accident notification</p>
                       <p class="mt-1 text-sm leading-6 text-muted">
                         Minor crash reported 120 m ahead. ETA may increase by 4 minutes if the route stays unchanged.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="absolute left-[20%] top-[60%] max-w-[250px] rounded-2xl border border-line bg-paper px-4 py-3 shadow-sm">
+                  <div class="flex items-start gap-3">
+                    <span class="material-symbols-outlined text-muted" style="font-variation-settings: 'FILL' 1"
+                      >cell_tower</span
+                    >
+                    <div>
+                      <p class="text-sm font-semibold text-ink">SOS deadzone warning</p>
+                      <p class="mt-1 text-sm leading-6 text-muted">
+                        Cell coverage may drop for the next 30 miles. Emergency calling could be unavailable in this segment.
                       </p>
                     </div>
                   </div>
@@ -218,6 +232,10 @@
                 <span class="text-sm text-muted">Route deviation</span>
                 <span class="text-sm font-medium text-success">No deviation</span>
               </div>
+              <div class="flex items-center justify-between rounded-2xl bg-soft px-4 py-3">
+                <span class="text-sm text-muted">Cell coverage</span>
+                <span class="text-sm font-medium text-ink">Deadzone ahead</span>
+              </div>
             </div>
 
             <div class="mt-6 flex gap-3">
@@ -242,7 +260,7 @@
             <div class="mt-5 space-y-4">
               <div class="rounded-2xl border border-line p-4">
                 <div class="flex items-start gap-3">
-                  <span class="material-symbols-outlined text-alert" style="font-variation-settings: 'FILL' 1"
+                  <span class="material-symbols-outlined text-muted" style="font-variation-settings: 'FILL' 1"
                     >notification_important</span
                   >
                   <div>
@@ -262,6 +280,19 @@
                     <p class="text-sm font-semibold">Alternate route available</p>
                     <p class="mt-1 text-sm leading-6 text-muted">
                       Adds 3 minutes but avoids the blocked road section and keeps trip tracking uninterrupted.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div class="rounded-2xl border border-line p-4">
+                <div class="flex items-start gap-3">
+                  <span class="material-symbols-outlined text-muted" style="font-variation-settings: 'FILL' 1"
+                    >signal_cellular_off</span
+                  >
+                  <div>
+                    <p class="text-sm font-semibold">Coverage loss expected</p>
+                    <p class="mt-1 text-sm leading-6 text-muted">
+                      The next segment includes a 30-mile no-service stretch. Guardian alerts may be delayed until coverage returns.
                     </p>
                   </div>
                 </div>
