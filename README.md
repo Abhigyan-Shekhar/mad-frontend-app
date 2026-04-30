@@ -2,13 +2,6 @@
 
 This folder contains a small linked prototype for SafeRoute built as standalone HTML files styled with Tailwind via CDN.
 
-## Pages
-
-- `index.html`: landing page
-- `plan-your-journey.html`: route selection page
-- `safety-score.html`: safety score dashboard
-- `guardian-tracking.html`: live trip tracking and guardian mode
-
 ## Key Features
 
 - Safer route comparison
