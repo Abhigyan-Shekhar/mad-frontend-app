@@ -4,21 +4,26 @@ import { PlanJourney } from "./components/PlanJourney";
 import { SafetyScore } from "./components/SafetyScore";
 import { GuardianMode } from "./components/GuardianMode";
 
-export const router = createBrowserRouter([
+export const router = createBrowserRouter(
+  [
+    {
+      path: "/",
+      Component: Home,
+    },
+    {
+      path: "/plan-journey",
+      Component: PlanJourney,
+    },
+    {
+      path: "/safety-score",
+      Component: SafetyScore,
+    },
+    {
+      path: "/guardian-mode",
+      Component: GuardianMode,
+    },
+  ],
   {
-    path: "/",
-    Component: Home,
-  },
-  {
-    path: "/plan-journey",
-    Component: PlanJourney,
-  },
-  {
-    path: "/safety-score",
-    Component: SafetyScore,
-  },
-  {
-    path: "/guardian-mode",
-    Component: GuardianMode,
-  },
-]);
+    basename: import.meta.env.BASE_URL,
+  }
+);
