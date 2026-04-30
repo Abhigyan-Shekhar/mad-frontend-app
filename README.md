@@ -17,13 +17,6 @@ This folder contains a small linked prototype for SafeRoute built as standalone 
 - Accident notifications on the route
 - SOS deadzone warning for long stretches with poor or zero cellular coverage
 
-## Navigation Flow
-
-- `index.html` links into route planning and guardian mode.
-- `plan-your-journey.html` links into safety scoring and trip tracking.
-- `safety-score.html` links back to route planning and forward to guardian mode.
-- `guardian-tracking.html` links back across the rest of the flow.
-
 Each page also includes a shared top navigation bar so you can move between all screens directly.
 
 ## Cellular Deadzone Warning
