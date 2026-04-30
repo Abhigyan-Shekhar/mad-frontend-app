@@ -4,26 +4,21 @@ import { PlanJourney } from "./components/PlanJourney";
 import { SafetyScore } from "./components/SafetyScore";
 import { GuardianMode } from "./components/GuardianMode";
 
-export const router = createHashRouter(
-  [
-    {
-      path: "/",
-      Component: Home,
-    },
-    {
-      path: "/plan-journey",
-      Component: PlanJourney,
-    },
-    {
-      path: "/safety-score",
-      Component: SafetyScore,
-    },
-    {
-      path: "/guardian-mode",
-      Component: GuardianMode,
-    },
-  ],
+export const router = createHashRouter([
   {
-    basename: import.meta.env.BASE_URL,
-  }
-);
+    path: "/",
+    Component: Home,
+  },
+  {
+    path: "/plan-journey",
+    Component: PlanJourney,
+  },
+  {
+    path: "/safety-score",
+    Component: SafetyScore,
+  },
+  {
+    path: "/guardian-mode",
+    Component: GuardianMode,
+  },
+]);
