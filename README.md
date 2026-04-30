@@ -1,11 +1,49 @@
+# SafeRoute Static Screens
 
-  # saferoute
+This folder contains a small linked prototype for SafeRoute built as standalone HTML files styled with Tailwind via CDN.
 
-  This is a code bundle for saferoute. The original project is available at https://www.figma.com/design/FGCsSjsKEFtV0apkltH700/saferoute.
+## Pages
 
-  ## Running the code
+- `index.html`: landing page
+- `plan-your-journey.html`: route selection page
+- `safety-score.html`: safety score dashboard
+- `guardian-tracking.html`: live trip tracking and guardian mode
 
-  Run `npm i` to install the dependencies.
+## Key Features
 
-  Run `npm run dev` to start the development server.
-  
+- Safer route comparison
+- Safety score based on potholes, roadlights, and theft
+- Guardian mode with live trip tracking
+- Accident notifications on the route
+- SOS deadzone warning for long stretches with poor or zero cellular coverage
+
+## Navigation Flow
+
+- `index.html` links into route planning and guardian mode.
+- `plan-your-journey.html` links into safety scoring and trip tracking.
+- `safety-score.html` links back to route planning and forward to guardian mode.
+- `guardian-tracking.html` links back across the rest of the flow.
+
+Each page also includes a shared top navigation bar so you can move between all screens directly.
+
+## Cellular Deadzone Warning
+
+The prototype now includes a frontend concept for a cellular coverage risk layer:
+
+- Faster routes can be flagged if they enter a long no-service stretch.
+- Slower routes can be preferred when they preserve full SOS coverage.
+- Guardian mode surfaces the deadzone warning during live trip tracking.
+
+This is intended to represent a future integration with route-coordinate analysis and cell tower density data.
+
+## Run
+
+Open any of the HTML files directly in a browser, or serve the folder with a static server.
+
+Example:
+
+```bash
+python3 -m http.server 8000
+```
+
+Then open `http://localhost:8000`.
