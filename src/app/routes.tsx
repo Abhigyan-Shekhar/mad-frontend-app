@@ -1,10 +1,10 @@
-import { createBrowserRouter } from "react-router";
+import { createHashRouter } from "react-router";
 import { Home } from "./components/Home";
 import { PlanJourney } from "./components/PlanJourney";
 import { SafetyScore } from "./components/SafetyScore";
 import { GuardianMode } from "./components/GuardianMode";
 
-export const router = createBrowserRouter(
+export const router = createHashRouter(
   [
     {
       path: "/",
