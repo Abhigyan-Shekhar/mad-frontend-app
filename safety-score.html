@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeRoute - Safety Score</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="bg-gray-50 pb-20">
+
+  <!-- Top Header -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="index.html" class="flex items-center gap-2">
+        <div class="bg-gradient-to-br from-slate-700 to-slate-900 rounded-xl p-2 shadow-md">
+          <i data-lucide="map-pin" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <div class="text-[9px] text-gray-500 uppercase tracking-widest font-bold">SafeRoute</div>
+          <div class="text-xs font-semibold text-gray-800 -mt-0.5">Safety Score</div>
+        </div>
+      </a>
+    </div>
+  </header>
+
+  <main class="max-w-md mx-auto px-4 py-6 space-y-6">
+    <!-- Safety Score Card -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 text-center animate-scaleIn">
+      <div class="text-xs text-gray-500 font-bold uppercase tracking-widest mb-3">Route Safety Score</div>
+
+      <div class="relative inline-block mb-6">
+        <svg class="w-32 h-32" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="54" fill="none" stroke="#e5e7eb" stroke-width="8" />
+          <circle
+            cx="60"
+            cy="60"
+            r="54"
+            fill="none"
+            stroke="#10b981"
+            stroke-width="8"
+            stroke-dasharray="339.292"
+            stroke-dashoffset="67.858"
+            stroke-linecap="round"
+            transform="rotate(-90 60 60)"
+            class="transition-all duration-1000"
+          />
+        </svg>
+        <div class="absolute inset-0 flex items-center justify-center">
+          <div class="text-5xl font-bold text-emerald-600">78</div>
+        </div>
+      </div>
+
+      <p class="text-base text-gray-700 leading-relaxed mb-6 font-medium">
+        Moderately safe for night commute on MG Road Corridor
+      </p>
+
+      <div class="grid grid-cols-3 gap-4 bg-gray-50 rounded-xl p-4 border border-gray-200">
+        <div>
+          <div class="text-xs text-gray-500 font-bold mb-1">Updated</div>
+          <div class="text-sm font-semibold text-gray-900">2m ago</div>
+        </div>
+        <div>
+          <div class="text-xs text-gray-500 font-bold mb-1">Area</div>
+          <div class="text-sm font-semibold text-gray-900">MG Road</div>
+        </div>
+        <div>
+          <div class="text-xs text-gray-500 font-bold mb-1">Time</div>
+          <div class="text-sm font-semibold text-gray-900">Night</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="bg-white rounded-xl shadow-md border border-gray-200 p-5 animate-slideUp">
+      <div class="text-xs text-gray-500 font-bold uppercase tracking-wide mb-3">Coverage Status</div>
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-sm font-semibold text-gray-700">Route Indexed</span>
+        <span class="text-sm font-bold text-emerald-600">100%</span>
+      </div>
+      <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+        <div class="h-full bg-emerald-500 rounded-full transition-all duration-1000" style="width: 100%"></div>
+      </div>
+    </div>
+
+    <!-- Metrics Grid -->
+    <div class="grid grid-cols-3 gap-3 animate-slideUp">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 transition-all duration-300 active:scale-95">
+        <div class="flex items-center justify-center w-10 h-10 bg-orange-100 rounded-xl mb-3 mx-auto">
+          <i data-lucide="alert-triangle" class="w-5 h-5 text-orange-600"></i>
+        </div>
+        <div class="text-xs text-gray-500 font-bold mb-1 text-center">Potholes</div>
+        <div class="text-2xl font-bold text-gray-900 text-center mb-2">9.4</div>
+        <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+          <div class="h-full bg-orange-500 rounded-full" style="width: 30%"></div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 transition-all duration-300 active:scale-95">
+        <div class="flex items-center justify-center w-10 h-10 bg-amber-100 rounded-xl mb-3 mx-auto">
+          <i data-lucide="zap" class="w-5 h-5 text-amber-600"></i>
+        </div>
+        <div class="text-xs text-gray-500 font-bold mb-1 text-center">Lights</div>
+        <div class="text-2xl font-bold text-gray-900 text-center mb-2">7.6</div>
+        <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+          <div class="h-full bg-amber-500 rounded-full" style="width: 35%"></div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 transition-all duration-300 active:scale-95">
+        <div class="flex items-center justify-center w-10 h-10 bg-red-100 rounded-xl mb-3 mx-auto">
+          <i data-lucide="shield" class="w-5 h-5 text-red-600"></i>
+        </div>
+        <div class="text-xs text-gray-500 font-bold mb-1 text-center">Theft</div>
+        <div class="text-2xl font-bold text-gray-900 text-center mb-2">3</div>
+        <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+          <div class="h-full bg-red-500 rounded-full" style="width: 33%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alerts -->
+    <div class="space-y-3 animate-slideUp">
+      <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 shadow-sm">
+        <div class="flex gap-3">
+          <div class="flex items-center justify-center w-10 h-10 bg-amber-100 rounded-xl flex-shrink-0">
+            <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-700"></i>
+          </div>
+          <div>
+            <div class="text-sm font-bold text-amber-900 mb-1">Route Forecast</div>
+            <div class="text-xs text-gray-700 leading-relaxed">
+              Church Street predicts slow traffic. Expect delays in this corridor.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-blue-50 border-2 border-blue-300 rounded-xl p-4 shadow-sm">
+        <div class="flex gap-3">
+          <div class="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-xl flex-shrink-0">
+            <i data-lucide="alert-circle" class="w-5 h-5 text-blue-600"></i>
+          </div>
+          <div>
+            <div class="text-sm font-bold text-blue-900 mb-1">Recommendation</div>
+            <div class="text-xs text-gray-700 leading-relaxed">
+              Choose the route with stronger lighting for better safety.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Map Preview -->
+    <div class="bg-white rounded-2xl shadow-md border border-gray-200 p-5 animate-slideUp">
+      <div class="text-sm font-bold text-gray-900 mb-4">Route Visualization</div>
+
+      <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 h-48 flex items-center justify-center shadow-lg mb-5">
+        <svg class="w-full h-full" viewBox="0 0 300 180">
+          <defs>
+            <linearGradient id="mapRoute" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#10b981" />
+              <stop offset="50%" stopColor="#059669" />
+              <stop offset="100%" stopColor="#047857" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M 40,150 Q 80,120 120,100 Q 160,80 200,65 Q 240,50 280,40"
+            fill="none"
+            stroke="url(#mapRoute)"
+            stroke-width="5"
+            stroke-linecap="round"
+            filter="drop-shadow(0 0 8px rgba(16, 185, 129, 0.5))"
+          />
+          <circle cx="40" cy="150" r="6" fill="#10b981" filter="drop-shadow(0 0 4px #10b981)"/>
+          <circle cx="120" cy="100" r="6" fill="#059669" filter="drop-shadow(0 0 4px #059669)"/>
+          <circle cx="200" cy="65" r="6" fill="#047857" filter="drop-shadow(0 0 4px #047857)"/>
+          <circle cx="280" cy="40" r="6" fill="#065f46" filter="drop-shadow(0 0 4px #065f46)"/>
+
+          <g transform="translate(120, 90)">
+            <path d="M 0,-8 L 5,0 L 0,7 L -5,0 Z" fill="#059669" />
+          </g>
+          <g transform="translate(200, 55)">
+            <path d="M 0,-8 L 5,0 L 0,7 L -5,0 Z" fill="#047857" />
+          </g>
+        </svg>
+      </div>
+
+      <div class="flex gap-3">
+        <a href="guardian-mode.html" class="flex-1 px-5 py-3.5 bg-slate-800 text-white rounded-xl font-bold text-center shadow-lg hover:bg-slate-900 transition-all duration-300 active:scale-95">
+          View Route
+        </a>
+        <button class="flex-1 px-5 py-3.5 border-2 border-gray-300 bg-white rounded-xl font-bold text-gray-700 hover:bg-gray-50 transition-all duration-300 active:scale-95">
+          Share
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="bg-white rounded-xl shadow-md border border-gray-200 p-5 animate-slideUp">
+      <div class="text-xs text-gray-500 font-bold uppercase tracking-wide mb-4">Last 7 Days</div>
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-gray-700 font-medium">Potholes Reported</span>
+          <span class="text-sm font-bold text-blue-600">+5</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-gray-700 font-medium">Lights Active</span>
+          <span class="text-sm font-bold text-gray-900">73%</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-gray-700 font-medium">Theft Incidents</span>
+          <span class="text-sm font-bold text-gray-900">3</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Bottom Navigation -->
+  <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 shadow-lg">
+    <div class="max-w-md mx-auto px-2 py-2">
+      <div class="flex items-center justify-around">
+        <a href="index.html" class="nav-link flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-300">
+          <i data-lucide="home" class="w-5 h-5"></i>
+          <span class="text-[10px] font-semibold">Home</span>
+        </a>
+        <a href="plan-journey.html" class="nav-link flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-300">
+          <i data-lucide="route" class="w-5 h-5"></i>
+          <span class="text-[10px] font-semibold">Routes</span>
+        </a>
+        <a href="safety-score.html" class="nav-link flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-300">
+          <i data-lucide="shield" class="w-5 h-5"></i>
+          <span class="text-[10px] font-semibold">Safety</span>
+        </a>
+        <a href="guardian-mode.html" class="nav-link flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-300">
+          <i data-lucide="radio" class="w-5 h-5"></i>
+          <span class="text-[10px] font-semibold">Guardian</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <script>
+    lucide.createIcons();
+    // Highlight active nav
+    const currentPath = window.location.pathname.split('/').pop() || 'index.html';
+    const navLinks = document.querySelectorAll('.nav-link');
+    navLinks.forEach(link => {
+      const href = link.getAttribute('href');
+      if (href === currentPath || (currentPath === '' && href === 'index.html')) {
+        link.classList.add('bg-slate-800', 'text-white', 'scale-105', 'shadow-lg');
+        link.classList.remove('text-gray-500', 'hover:bg-gray-100');
+      } else {
+        link.classList.add('text-gray-500', 'hover:bg-gray-100');
+        link.classList.remove('bg-slate-800', 'text-white', 'scale-105', 'shadow-lg');
+      }
+    });
+  </script>
+</body>
+</html>

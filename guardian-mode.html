@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeRoute - Guardian Mode</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="bg-gray-50 pb-20">
+
+  <!-- Top Header -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="index.html" class="flex items-center gap-2">
+        <div class="bg-gradient-to-br from-slate-700 to-slate-900 rounded-xl p-2 shadow-md">
+          <i data-lucide="map-pin" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <div class="text-[9px] text-gray-500 uppercase tracking-widest font-bold">SafeRoute</div>
+          <div class="text-xs font-semibold text-gray-800 -mt-0.5">Guardian Mode</div>
+        </div>
+      </a>
+    </div>
+  </header>
+
+  <main class="max-w-md mx-auto px-4 py-6 space-y-6">
+    <!-- Trip Header -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 animate-slideDown">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="text-xs text-gray-500 font-bold mb-1">Tracked Trip</div>
+          <h2 class="text-xl font-bold text-gray-900">Aarav to Hospital</h2>
+        </div>
+        <div class="flex items-center gap-2 bg-emerald-100 px-3 py-2 rounded-xl">
+          <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-lg shadow-emerald-500/50"></div>
+          <span class="text-xs font-bold text-emerald-700">LIVE</span>
+        </div>
+      </div>
+
+      <!-- Live Map -->
+      <div class="bg-gray-100 rounded-xl h-80 mb-6 relative overflow-hidden shadow-inner border border-gray-200">
+        <svg class="w-full h-full" viewBox="0 0 320 280">
+          <defs>
+            <pattern id="gridPattern" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#e5e7eb" stroke-width="0.5"/>
+            </pattern>
+          </defs>
+          <rect width="320" height="280" fill="url(#gridPattern)"/>
+
+          <!-- Route - upcoming (dashed) -->
+          <path
+            d="M 50,230 Q 80,200 110,180 Q 140,160 170,145 Q 200,130 230,120 Q 260,110 290,100"
+            fill="none"
+            stroke="#93c5fd"
+            stroke-width="3"
+            stroke-dasharray="6,6"
+            opacity="0.6"
+          />
+
+          <!-- Route - completed (solid) -->
+          <path
+            d="M 50,230 Q 80,200 110,180 Q 140,160 170,145"
+            fill="none"
+            stroke="#3b82f6"
+            stroke-width="4"
+            stroke-linecap="round"
+            filter="drop-shadow(0 0 4px rgba(59, 130, 246, 0.5))"
+          />
+
+          <!-- Start marker -->
+          <circle cx="50" cy="230" r="8" fill="#3b82f6" stroke="white" stroke-width="2.5" />
+          <text x="50" y="252" font-size="10" text-anchor="middle" font-weight="600" fill="#374151">Start</text>
+
+          <!-- Current position - animated -->
+          <circle cx="170" cy="145" r="10" fill="#10b981" stroke="white" stroke-width="3">
+            <animate attributeName="r" values="10;13;10" dur="2s" repeatCount="indefinite" />
+          </circle>
+          <circle cx="170" cy="145" r="20" fill="#10b981" opacity="0.2">
+            <animate attributeName="r" values="20;26;20" dur="2s" repeatCount="indefinite" />
+          </circle>
+
+          <!-- Accident warning -->
+          <g transform="translate(230, 120)">
+            <circle r="22" fill="#ef4444" opacity="0.15" />
+            <circle r="12" fill="#ef4444" />
+            <text x="0" y="5" font-size="12" font-weight="bold" fill="white" text-anchor="middle">!</text>
+          </g>
+          <rect x="130" y="90" width="100" height="45" rx="6" fill="white" stroke="#e5e7eb" stroke-width="1" filter="drop-shadow(0 1px 4px rgba(0,0,0,0.1))"/>
+          <text x="137" y="105" font-size="9" font-weight="600" fill="#374151">Accident Alert</text>
+          <text x="137" y="117" font-size="8" fill="#6b7280">Minor crash</text>
+          <text x="137" y="127" font-size="8" fill="#6b7280">120m ahead</text>
+
+          <!-- SOS warning -->
+          <g transform="translate(200, 130)">
+            <circle r="22" fill="#f59e0b" opacity="0.15" />
+            <circle r="12" fill="#f59e0b" />
+            <path d="M -3,-3 L 3,3 M 3,-3 L -3,3" stroke="white" stroke-width="2" stroke-linecap="round" />
+          </g>
+          <rect x="80" y="165" width="100" height="45" rx="6" fill="white" stroke="#e5e7eb" stroke-width="1" filter="drop-shadow(0 1px 4px rgba(0,0,0,0.1))"/>
+          <text x="87" y="180" font-size="9" font-weight="600" fill="#374151">SOS Warning</text>
+          <text x="87" y="192" font-size="8" fill="#6b7280">Signal may drop</text>
+          <text x="87" y="202" font-size="8" fill="#6b7280">in 30 miles</text>
+
+          <!-- Destination -->
+          <circle cx="290" cy="100" r="8" fill="#ef4444" stroke="white" stroke-width="2.5" />
+          <text x="290" y="88" font-size="10" text-anchor="middle" font-weight="600" fill="#374151">End</text>
+        </svg>
+      </div>
+
+      <!-- Trip Stats -->
+      <div class="grid grid-cols-4 gap-3 bg-gray-50 rounded-xl p-4 border border-gray-200">
+        <div class="text-center">
+          <div class="text-xs text-gray-500 font-bold mb-1">Start</div>
+          <div class="text-sm font-bold text-gray-900">8:03</div>
+        </div>
+        <div class="text-center">
+          <div class="text-xs text-gray-500 font-bold mb-1">Taken</div>
+          <div class="text-sm font-bold text-gray-900">27m</div>
+        </div>
+        <div class="text-center">
+          <div class="text-xs text-blue-600 font-bold mb-1">Left</div>
+          <div class="text-sm font-bold text-blue-600">12m</div>
+        </div>
+        <div class="text-center">
+          <div class="text-xs text-gray-500 font-bold mb-1">ETA</div>
+          <div class="text-sm font-bold text-gray-900">8:42</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Trip Status -->
+    <div class="bg-white rounded-2xl shadow-md border border-gray-200 p-6 animate-slideUp">
+      <div class="text-xs text-gray-500 font-bold uppercase tracking-wide mb-3">Trip Status</div>
+      <h3 class="text-xl font-bold text-gray-900 mb-4">Journey is Stable</h3>
+
+      <div class="space-y-4 mb-6">
+        <div class="flex items-center justify-between bg-gray-50 rounded-xl p-3 border border-gray-200">
+          <span class="text-sm text-gray-700 font-medium">Current Speed</span>
+          <span class="text-base font-bold text-gray-900">22 km/h</span>
+        </div>
+        <div class="flex items-center justify-between bg-gray-50 rounded-xl p-3 border border-gray-200">
+          <span class="text-sm text-gray-700 font-medium">Distance Left</span>
+          <span class="text-base font-bold text-gray-900">2.8 km</span>
+        </div>
+        <div class="flex items-center justify-between bg-blue-50 rounded-xl p-3 border border-blue-200">
+          <span class="text-sm text-gray-700 font-medium">Route Status</span>
+          <span class="text-base font-bold text-blue-600">On Track</span>
+        </div>
+        <div class="flex items-center justify-between bg-amber-50 rounded-xl p-3 border border-amber-200">
+          <span class="text-sm text-gray-700 font-medium">Coverage</span>
+          <span class="text-base font-bold text-amber-600">⚠️ Zone Ahead</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <button class="px-5 py-3.5 bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-slate-900 transition-all duration-300 active:scale-95">
+          <i data-lucide="phone" class="w-4 h-4"></i>
+          Call
+        </button>
+        <button class="px-5 py-3.5 border-2 border-gray-300 bg-white rounded-xl font-bold text-gray-700 flex items-center justify-center gap-2 hover:bg-gray-50 transition-all duration-300 active:scale-95">
+          <i data-lucide="message-square" class="w-4 h-4"></i>
+          Message
+        </button>
+      </div>
+    </div>
+
+    <!-- Live Alerts -->
+    <div class="bg-white rounded-2xl shadow-md border border-gray-200 p-6 animate-slideUp">
+      <div class="flex items-center justify-between mb-5">
+        <div class="text-sm font-bold text-gray-900">Live Alerts</div>
+        <div class="bg-orange-100 text-orange-700 px-3 py-1 rounded-lg text-xs font-bold">2 Active</div>
+      </div>
+
+      <div class="space-y-3">
+        <div class="bg-red-50 border-2 border-red-300 rounded-xl p-4 shadow-sm">
+          <div class="flex gap-3">
+            <div class="flex items-center justify-center w-10 h-10 bg-red-100 rounded-xl flex-shrink-0">
+              <i data-lucide="navigation" class="w-5 h-5 text-red-600"></i>
+            </div>
+            <div>
+              <div class="text-sm font-bold text-red-900 mb-1">Accident Ahead</div>
+              <div class="text-xs text-gray-700 leading-relaxed">
+                Crash near Richmond Circle. ETA updated to 8:42 PM.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-blue-50 border-2 border-blue-300 rounded-xl p-4 shadow-sm">
+          <div class="flex gap-3">
+            <div class="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-xl flex-shrink-0">
+              <i data-lucide="map-pin" class="w-5 h-5 text-blue-600"></i>
+            </div>
+            <div>
+              <div class="text-sm font-bold text-blue-900 mb-1">Alternate Route</div>
+              <div class="text-xs text-gray-700 leading-relaxed">
+                Adds 3 min but avoids blocked section.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 shadow-sm">
+          <div class="flex gap-3">
+            <div class="flex items-center justify-center w-10 h-10 bg-amber-100 rounded-xl flex-shrink-0">
+              <i data-lucide="radio" class="w-5 h-5 text-amber-700"></i>
+            </div>
+            <div>
+              <div class="text-sm font-bold text-amber-900 mb-1">Coverage Loss</div>
+              <div class="text-xs text-gray-700 leading-relaxed">
+                30-mile no-service zone. Alerts may be delayed.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Features -->
+    <div class="grid grid-cols-3 gap-3 animate-slideUp">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 text-center transition-all duration-300 active:scale-95">
+        <div class="flex items-center justify-center w-12 h-12 bg-orange-100 rounded-xl mb-3 mx-auto">
+          <i data-lucide="alert-triangle" class="w-6 h-6 text-orange-600"></i>
+        </div>
+        <div class="text-xs font-bold text-gray-900 mb-1">Accident</div>
+        <div class="text-xs text-gray-600">Real-time alerts</div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 text-center transition-all duration-300 active:scale-95">
+        <div class="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-xl mb-3 mx-auto">
+          <i data-lucide="radio" class="w-6 h-6 text-blue-600"></i>
+        </div>
+        <div class="text-xs font-bold text-gray-900 mb-1">Guardian</div>
+        <div class="text-xs text-gray-600">Live tracking</div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 text-center transition-all duration-300 active:scale-95">
+        <div class="flex items-center justify-center w-12 h-12 bg-emerald-100 rounded-xl mb-3 mx-auto">
+          <i data-lucide="clock" class="w-6 h-6 text-emerald-600"></i>
+        </div>
+        <div class="text-xs font-bold text-gray-900 mb-1">Time</div>
+        <div class="text-xs text-gray-600">Accurate ETA</div>
+      </div>
+    </div>
+
+    <!-- Guardian Actions -->
+    <div class="bg-white rounded-2xl shadow-md border border-gray-200 p-6 animate-slideUp">
+      <div class="text-xs text-gray-500 font-bold uppercase tracking-wide mb-4">Quick Actions</div>
+      <div class="space-y-3">
+        <button class="w-full flex items-center justify-between bg-gray-50 hover:bg-gray-100 rounded-xl p-4 border border-gray-200 transition-all duration-300 active:scale-98">
+          <span class="text-sm font-bold text-gray-900">View Trip History</span>
+          <svg class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+        <button class="w-full flex items-center justify-between bg-red-50 hover:bg-red-100 rounded-xl p-4 border-2 border-red-300 transition-all duration-300 active:scale-98">
+          <span class="text-sm font-bold text-red-900">Emergency Contact</span>
+          <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Bottom Navigation -->
+  <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 shadow-lg">
+    <div class="max-w-md mx-auto px-2 py-2">
+      <div class="flex items-center justify-around">
+        <a href="index.html" class="nav-link flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-300">
+          <i data-lucide="home" class="w-5 h-5"></i>
+          <span class="text-[10px] font-semibold">Home</span>
+        </a>
+        <a href="plan-journey.html" class="nav-link flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-300">
+          <i data-lucide="route" class="w-5 h-5"></i>
+          <span class="text-[10px] font-semibold">Routes</span>
+        </a>
+        <a href="safety-score.html" class="nav-link flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-300">
+          <i data-lucide="shield" class="w-5 h-5"></i>
+          <span class="text-[10px] font-semibold">Safety</span>
+        </a>
+        <a href="guardian-mode.html" class="nav-link flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-300">
+          <i data-lucide="radio" class="w-5 h-5"></i>
+          <span class="text-[10px] font-semibold">Guardian</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <script>
+    lucide.createIcons();
+    // Highlight active nav
+    const currentPath = window.location.pathname.split('/').pop() || 'index.html';
+    const navLinks = document.querySelectorAll('.nav-link');
+    navLinks.forEach(link => {
+      const href = link.getAttribute('href');
+      if (href === currentPath || (currentPath === '' && href === 'index.html')) {
+        link.classList.add('bg-slate-800', 'text-white', 'scale-105', 'shadow-lg');
+        link.classList.remove('text-gray-500', 'hover:bg-gray-100');
+      } else {
+        link.classList.add('text-gray-500', 'hover:bg-gray-100');
+        link.classList.remove('bg-slate-800', 'text-white', 'scale-105', 'shadow-lg');
+      }
+    });
+  </script>
+</body>
+</html>
