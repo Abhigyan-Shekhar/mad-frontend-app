@@ -1,45 +1,46 @@
 # SafeRoute
 
-SafeRoute is a modern, responsive web application designed for intelligent and secure navigation. It prioritizes user safety by providing real-time data on route conditions, lighting, emergency access, and incident alerts.
+SafeRoute is a modern, mobile-first web application designed for intelligent and secure navigation. It prioritizes user safety by tracking live journeys, predicting hazards, and instantly alerting emergency contacts when needed.
 
-This repository contains the pure, zero-dependency static frontend for SafeRoute.
+## Architecture & Stack
 
-## Architecture
+SafeRoute is divided into two distinct components:
 
-The project has been simplified from a complex React/Vite/TypeScript setup to a clean, fast, and easy-to-deploy static site using plain HTML, CSS, and Vanilla JavaScript.
+1. **Frontend (Static UI)**
+   - Built with plain HTML, CSS, and Vanilla JS (zero build tools).
+   - Styled with Tailwind CSS (via CDN) and Lucide Icons.
+   - Hosted effortlessly on any static server (like GitHub Pages or Vercel).
 
-- **Zero Build Step:** No `npm install`, no `vite build`, no `node_modules`.
-- **Styling:** Uses Tailwind CSS via CDN.
-- **Icons:** Uses Lucide Icons via CDN.
-- **Animations:** Custom CSS animations defined in `style.css`.
+2. **Backend (Supabase)**
+   - Powered by a robust **Supabase PostgreSQL** database.
+   - The backend schema (`supabase/schema.sql`) provides the complete foundation for the app's functionality:
+     - **Profiles & Contacts:** Manage user accounts and emergency contacts.
+     - **Live Tracking (Guardian Mode):** Uses Supabase Realtime to broadcast live GPS coordinates and speed.
+     - **Hazards:** A community-driven system to report potholes, bad lighting, or dead zones.
+     - **SOS Alerts:** A dedicated emergency trigger that instantly updates trip status and notifies guardians.
+   - Fully secured using strict Row Level Security (RLS) policies.
 
-## Pages Directory
+## Project Structure
 
-The application consists of 4 main pages:
+```text
+mad-frontend-app/
+├── supabase/
+│   └── schema.sql       ← Full backend database schema & logic (Run this in Supabase)
+├── index.html           ← Home page
+├── plan-journey.html    ← Plan Journey & Route Selection
+├── safety-score.html    ← Live Safety Metrics & Alerts
+├── guardian-mode.html   ← Active Trip Tracking & SOS
+└── style.css            ← Shared CSS animations
+```
 
-1. **`index.html` (Home)**
-   - The landing page of the application.
-   - Features quick navigation options, key statistics, and a live monitoring map snippet showing the active "Sentinel Protocol."
-   - Warns users of any immediate SOS dead zones.
+## Setup Instructions
 
-2. **`plan-journey.html` (Routes / Plan Journey)**
-   - Allows users to compare different routes (e.g., "Well-lit Streets", "Standard Path", "Direct Route").
-   - Highlights route duration, cell coverage status, and safety features.
-   - Includes real-time warnings (e.g., no-service zones).
+### 1. The Frontend
+Since there are no dependencies or build steps, simply open `index.html` in your browser or host the files on a static server.
 
-3. **`safety-score.html` (Safety Metrics)**
-   - Displays a comprehensive "Route Safety Score" (0-100).
-   - Breaks down safety metrics such as pothole reports, active streetlights, and recent theft incidents.
-   - Provides live route forecasts and actionable recommendations based on current data.
-
-4. **`guardian-mode.html` (Live Tracking & Guardian)**
-   - An active trip monitoring dashboard.
-   - Shows a live map with current position, upcoming hazards, SOS warnings, and accident alerts.
-   - Includes quick action buttons to contact emergency services or share trip history.
-
-## Development & Deployment
-
-Because this is a pure static site, you don't need any special tools to run or deploy it:
-
-- **Local Development:** Simply double-click `index.html` to open it in your browser, or use a basic local server (like VS Code Live Server or `python -m http.server`).
-- **Deployment:** You can host this instantly on **GitHub Pages**, Vercel, Netlify, or any basic web server by simply uploading the files. No build configuration is required.
+### 2. The Backend
+1. Create a free account at [Supabase](https://supabase.com).
+2. Create a new project.
+3. Open the **SQL Editor** in the Supabase dashboard.
+4. Copy and paste the entire contents of `supabase/schema.sql` and click **Run**.
+5. Your database, real-time broadcasts, triggers, and security policies will be instantly generated.
