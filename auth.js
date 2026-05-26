@@ -1,7 +1,7 @@
 // Initialize Supabase
 const supabaseUrl = 'https://ezkwxnruzpjjarpieoll.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV6a3d4bnJ1enBqamFycGllb2xsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMzczNjcsImV4cCI6MjA5NDkxMzM2N30.F7Sqzrre1dovmtti51O1NMglp_nUamFPgvjl1r1zUfQ';
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 // DOM Elements
 const emailInput = document.getElementById('email');
@@ -37,7 +37,7 @@ if(signupBtn) {
     signupBtn.disabled = true;
     signupBtn.innerHTML = "Creating...";
 
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await supabaseClient.auth.signUp({
       email: email,
       password: password,
       options: {
@@ -70,7 +70,7 @@ if(loginBtn) {
     loginBtn.disabled = true;
     loginBtn.innerHTML = "Signing in...";
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
       email: email,
       password: password,
     });
@@ -88,7 +88,7 @@ if(loginBtn) {
 
 // Check if already logged in on other pages
 async function checkAuth() {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session && !window.location.href.includes('login.html') && !window.location.href.includes('index.html')) {
     window.location.href = "login.html";
   }
