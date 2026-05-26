@@ -7,32 +7,65 @@ class SupabaseService {
 
   SupabaseClient get _client => Supabase.instance.client;
   User? get currentUser => _client.auth.currentUser;
+  Session? get currentSession => _client.auth.currentSession;
+
+  String get _userId {
+    final id = currentUser?.id;
+    if (id == null) throw StateError('Sign in required.');
+    return id;
+  }
 
   // ─── AUTH ────────────────────────────────────────────────────
+  Future<AuthResponse> signIn({
+    required String email,
+    required String password,
+  }) {
+    return _client.auth.signInWithPassword(email: email, password: password);
+  }
+
+  Future<AuthResponse> signUp({
+    required String email,
+    required String password,
+    required String fullName,
+  }) {
+    return _client.auth.signUp(
+      email: email,
+      password: password,
+      data: {'full_name': fullName},
+    );
+  }
+
   Future<void> signOut() => _client.auth.signOut();
 
+  Future<Map<String, dynamic>?> getMyProfile() async {
+    final user = currentUser;
+    if (user == null) return null;
+    return _client.from('profiles').select().eq('id', user.id).maybeSingle();
+  }
+
   // ─── TRIPS ───────────────────────────────────────────────────
-  Future<String> startTrip({
-    required String from,
-    required String to,
-    double? startLat,
-    double? startLng,
-    double? endLat,
-    double? endLng,
-    double? safetyScore,
+  Future<Map<String, dynamic>> startTrip({
+    required double startLat,
+    required double startLng,
+    required double endLat,
+    required double endLng,
+    required String destinationName,
   }) async {
+    final existing = await getActiveTrip();
+    if (existing != null) {
+      throw StateError('End the current active trip before starting another.');
+    }
+
     final resp = await _client.from('trips').insert({
-      'user_id': currentUser!.id,
-      'from_label': from,
-      'to_label': to,
+      'user_id': _userId,
       'start_lat': startLat,
       'start_lng': startLng,
       'end_lat': endLat,
       'end_lng': endLng,
-      'safety_score': safetyScore,
+      'destination_name': destinationName,
       'status': 'active',
-    }).select('id').single();
-    return resp['id'] as String;
+    }).select().single();
+    return Map<String, dynamic>.from(resp);
   }
 
   Future<void> endTrip(String tripId) async {
@@ -43,12 +76,25 @@ class SupabaseService {
   }
 
   Future<List<Map<String, dynamic>>> getMyTrips() async {
-    return await _client
+    final rows = await _client
         .from('trips')
         .select()
-        .eq('user_id', currentUser!.id)
+        .eq('user_id', _userId)
         .order('created_at', ascending: false)
         .limit(20);
+    return rows.map((row) => Map<String, dynamic>.from(row)).toList();
+  }
+
+  Future<Map<String, dynamic>?> getActiveTrip() async {
+    final rows = await _client
+        .from('trips')
+        .select()
+        .eq('user_id', _userId)
+        .inFilter('status', ['active', 'sos_triggered'])
+        .order('created_at', ascending: false)
+        .limit(1);
+    if (rows.isEmpty) return null;
+    return Map<String, dynamic>.from(rows.first);
   }
 
   // ─── LOCATION PINGS ──────────────────────────────────────────
@@ -57,12 +103,14 @@ class SupabaseService {
     required double lat,
     required double lng,
     double speed = 0,
+    int? batteryLevel,
   }) async {
     await _client.from('location_pings').insert({
       'trip_id': tripId,
       'lat': lat,
       'lng': lng,
       'speed': speed,
+      if (batteryLevel != null) 'battery_level': batteryLevel,
     });
   }
 
@@ -72,23 +120,42 @@ class SupabaseService {
         .from('location_pings')
         .stream(primaryKey: ['id'])
         .eq('trip_id', tripId)
-        .order('created_at', ascending: false)
+        .order('timestamp', ascending: false)
         .limit(1);
   }
 
+  Future<Map<String, dynamic>?> getLatestTripPing(String tripId) async {
+    final rows = await _client
+        .from('location_pings')
+        .select()
+        .eq('trip_id', tripId)
+        .order('timestamp', ascending: false)
+        .limit(1);
+    if (rows.isEmpty) return null;
+    return Map<String, dynamic>.from(rows.first);
+  }
+
   // ─── SOS ALERTS ──────────────────────────────────────────────
-  Future<void> triggerSOS({
+  Future<Map<String, dynamic>> triggerSOS({
     required double lat,
     required double lng,
     String? tripId,
   }) async {
-    await _client.from('sos_alerts').insert({
-      'user_id': currentUser!.id,
+    final row = await _client.from('sos_alerts').insert({
+      'user_id': _userId,
       'trip_id': tripId,
       'lat': lat,
       'lng': lng,
       'is_resolved': false,
-    });
+    }).select().single();
+    return Map<String, dynamic>.from(row);
+  }
+
+  Future<void> resolveSOS(String alertId) async {
+    await _client.from('sos_alerts').update({
+      'is_resolved': true,
+      'resolved_at': DateTime.now().toIso8601String(),
+    }).eq('id', alertId);
   }
 
   // ─── HAZARDS ─────────────────────────────────────────────────
@@ -99,7 +166,7 @@ class SupabaseService {
     required String description,
   }) async {
     await _client.from('hazards').insert({
-      'reporter_id': currentUser!.id,
+      'reporter_id': _userId,
       'hazard_type': hazardType,
       'lat': lat,
       'lng': lng,
@@ -109,7 +176,13 @@ class SupabaseService {
   }
 
   Future<List<Map<String, dynamic>>> getActiveHazards() async {
-    return await _client.from('hazards').select().eq('is_active', true).limit(50);
+    final rows = await _client
+        .from('hazards')
+        .select()
+        .eq('is_active', true)
+        .order('created_at', ascending: false)
+        .limit(100);
+    return rows.map((row) => Map<String, dynamic>.from(row)).toList();
   }
 
   /// Realtime stream for new hazards
@@ -128,22 +201,25 @@ class SupabaseService {
 
   // ─── EMERGENCY CONTACTS ──────────────────────────────────────
   Future<List<Map<String, dynamic>>> getEmergencyContacts() async {
-    return await _client
+    final rows = await _client
         .from('emergency_contacts')
         .select()
-        .eq('user_id', currentUser!.id);
+        .eq('user_id', _userId)
+        .order('is_primary', ascending: false)
+        .order('created_at', ascending: true);
+    return rows.map((row) => Map<String, dynamic>.from(row)).toList();
   }
 
   Future<void> addEmergencyContact({
     required String name,
     required String phone,
-    String relation = 'Guardian',
+    bool isPrimary = false,
   }) async {
     await _client.from('emergency_contacts').insert({
-      'user_id': currentUser!.id,
-      'name': name,
-      'phone': phone,
-      'relation': relation,
+      'user_id': _userId,
+      'contact_name': name,
+      'phone_number': phone,
+      'is_primary': isPrimary,
     });
   }
 

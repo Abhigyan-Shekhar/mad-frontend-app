@@ -16,8 +16,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Widget> get _screens => [
     TabHomeScreen(onPlanJourneyTap: () => setState(() => _currentIndex = 1)),
-    const TabPlanJourneyScreen(),
-    const TabSafetyScoreScreen(),
+    TabPlanJourneyScreen(onTripStarted: () => setState(() => _currentIndex = 3)),
+    TabSafetyScoreScreen(onViewRoute: () => setState(() => _currentIndex = 3)),
     const TabGuardianScreen(),
   ];
 

@@ -4,6 +4,7 @@
 
 -- Enable PostGIS extension for geographic queries (useful for finding hazards near a user)
 CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ==========================================
 -- 1. Profiles Table

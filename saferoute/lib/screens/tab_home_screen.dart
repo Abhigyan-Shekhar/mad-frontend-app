@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../services/bbmp_service.dart';
+import '../services/location_service.dart';
 import '../services/supabase_service.dart';
-import '../widgets/safe_header.dart';
 
 class TabHomeScreen extends StatefulWidget {
   final VoidCallback? onPlanJourneyTap;
@@ -15,6 +15,10 @@ class TabHomeScreen extends StatefulWidget {
 
 class _TabHomeScreenState extends State<TabHomeScreen> {
   Map<String, WardScore> _wardScores = {};
+  List<Map<String, dynamic>> _hazards = [];
+  List<Map<String, dynamic>> _trips = [];
+  List<Map<String, dynamic>> _contacts = [];
+  LatLng? _currentPoint;
   bool _loading = true;
 
   @override
@@ -26,7 +30,26 @@ class _TabHomeScreenState extends State<TabHomeScreen> {
   Future<void> _loadScores() async {
     try {
       final scores = await BbmpService.instance.getWardScores();
-      if (mounted) setState(() { _wardScores = scores; _loading = false; });
+      final hazards = await SupabaseService.instance.getActiveHazards();
+      final trips = await SupabaseService.instance.getMyTrips();
+      final contacts = await SupabaseService.instance.getEmergencyContacts();
+      LatLng? currentPoint;
+      try {
+        final position = await LocationService.currentPosition();
+        currentPoint = LatLng(position.latitude, position.longitude);
+      } catch (_) {
+        currentPoint = null;
+      }
+      if (mounted) {
+        setState(() {
+          _wardScores = scores;
+          _hazards = hazards;
+          _trips = trips;
+          _contacts = contacts;
+          _currentPoint = currentPoint;
+          _loading = false;
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
@@ -98,7 +121,7 @@ class _TabHomeScreenState extends State<TabHomeScreen> {
               _SlateButton(label: 'Get Started', icon: Icons.bolt_rounded, onTap: widget.onPlanJourneyTap ?? () {}),
               const SizedBox(height: 12),
               OutlinedButton(
-                onPressed: () {},
+                onPressed: widget.onPlanJourneyTap,
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xFFD1D5DB), width: 2),
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -110,11 +133,11 @@ class _TabHomeScreenState extends State<TabHomeScreen> {
 
               // ── Stats cards ───────────────────────────────────
               Row(children: [
-                Expanded(child: _StatCard(icon: Icons.people_rounded, iconColor: const Color(0xFF2563EB), bgColor: const Color(0xFFEFF6FF), label: 'Users', value: '1.2K+')),
+                Expanded(child: _StatCard(icon: Icons.route_rounded, iconColor: const Color(0xFF2563EB), bgColor: const Color(0xFFEFF6FF), label: 'Trips', value: _trips.length.toString())),
                 const SizedBox(width: 10),
-                Expanded(child: _StatCard(icon: Icons.access_time_rounded, iconColor: const Color(0xFF059669), bgColor: const Color(0xFFECFDF5), label: 'Support', value: '24/7')),
+                Expanded(child: _StatCard(icon: Icons.warning_rounded, iconColor: const Color(0xFF059669), bgColor: const Color(0xFFECFDF5), label: 'Alerts', value: _hazards.length.toString())),
                 const SizedBox(width: 10),
-                Expanded(child: _StatCard(icon: Icons.shield_rounded, iconColor: const Color(0xFFD97706), bgColor: const Color(0xFFFFFBEB), label: 'Safety', value: 'Solo')),
+                Expanded(child: _StatCard(icon: Icons.shield_rounded, iconColor: const Color(0xFFD97706), bgColor: const Color(0xFFFFFBEB), label: 'Guardians', value: _contacts.length.toString())),
               ]),
               const SizedBox(height: 24),
 
@@ -140,10 +163,12 @@ class _TabHomeScreenState extends State<TabHomeScreen> {
                       const Text('Live Monitoring', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF059669), letterSpacing: 0.5)),
                     ]),
                     const SizedBox(height: 12),
-                    const Text('Sentinel Protocol Active', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF111827))),
+                    Text(_activeTrip == null ? 'Sentinel Protocol Ready' : 'Sentinel Protocol Active', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF111827))),
                     const SizedBox(height: 6),
-                    const Text('Your area has active lighting coverage, secure traffic flow, and reliable mobile network service.',
-                        style: TextStyle(fontSize: 13, color: Color(0xFF6B7280), height: 1.5)),
+                    Text(_hazards.isEmpty
+                        ? 'No active community hazards are currently loaded from Supabase.'
+                        : '${_hazards.length} active community hazard(s) are loaded from Supabase.',
+                        style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280), height: 1.5)),
                     const SizedBox(height: 20),
 
                     // Mini Bengaluru map
@@ -152,18 +177,18 @@ class _TabHomeScreenState extends State<TabHomeScreen> {
                       child: SizedBox(
                         height: 180,
                         child: FlutterMap(
-                          options: const MapOptions(
-                            initialCenter: LatLng(12.9716, 77.5946),
+                          options: MapOptions(
+                            initialCenter: _currentPoint ?? const LatLng(12.9716, 77.5946),
                             initialZoom: 12,
-                            interactionOptions: InteractionOptions(flags: InteractiveFlag.none),
+                            interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
                           ),
                           children: [
                             TileLayer(
                               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                               userAgentPackageName: 'com.saferoute.app',
                             ),
-                            const CircleLayer(circles: [
-                              CircleMarker(point: LatLng(12.9716, 77.5946), radius: 5, color: Color(0xFF10B981), borderColor: Colors.white, borderStrokeWidth: 2, useRadiusInMeter: false),
+                            CircleLayer(circles: [
+                              CircleMarker(point: _currentPoint ?? const LatLng(12.9716, 77.5946), radius: 5, color: const Color(0xFF10B981), borderColor: Colors.white, borderStrokeWidth: 2, useRadiusInMeter: false),
                             ]),
                           ],
                         ),
@@ -176,20 +201,20 @@ class _TabHomeScreenState extends State<TabHomeScreen> {
                       Expanded(child: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFD1FAE5))),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
-                          Text('Safe Route', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF059669))),
-                          SizedBox(height: 2),
-                          Text('MG Road', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF111827))),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          const Text('Safe Route', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF059669))),
+                          const SizedBox(height: 2),
+                          Text(_activeTrip?['destination_name']?.toString() ?? 'Plan route', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF111827))),
                         ]),
                       )),
                       const SizedBox(width: 10),
                       Expanded(child: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFBFDBFE))),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
-                          Text('Guardian', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF2563EB))),
-                          SizedBox(height: 2),
-                          Text('Available', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF111827))),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          const Text('Guardian', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF2563EB))),
+                          const SizedBox(height: 2),
+                          Text(_contacts.isEmpty ? 'Add contact' : '${_contacts.length} ready', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF111827))),
                         ]),
                       )),
                     ]),
@@ -215,11 +240,13 @@ class _TabHomeScreenState extends State<TabHomeScreen> {
                     child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFB45309), size: 22),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('SOS Deadzone Alert', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF78350F))),
-                    SizedBox(height: 3),
-                    Text('Get warned about areas with weak cell coverage before you start your journey.',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF374151), height: 1.4)),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('SOS Deadzone Alert', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF78350F))),
+                    const SizedBox(height: 3),
+                    Text(_deadzoneCount == 0
+                        ? 'No active deadzone hazards are currently reported.'
+                        : '$_deadzoneCount active deadzone hazard(s) are currently reported.',
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF374151), height: 1.4)),
                   ])),
                 ]),
               ),
@@ -236,6 +263,18 @@ class _TabHomeScreenState extends State<TabHomeScreen> {
         ],
       ),
     );
+  }
+
+  Map<String, dynamic>? get _activeTrip {
+    for (final trip in _trips) {
+      final status = trip['status']?.toString();
+      if (status == 'active' || status == 'sos_triggered') return trip;
+    }
+    return null;
+  }
+
+  int get _deadzoneCount {
+    return _hazards.where((hazard) => hazard['hazard_type'] == 'deadzone').length;
   }
 }
 
