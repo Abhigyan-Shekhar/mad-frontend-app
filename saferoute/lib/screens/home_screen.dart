@@ -14,11 +14,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [
-    TabHomeScreen(),
-    TabPlanJourneyScreen(),
-    TabSafetyScoreScreen(),
-    TabGuardianScreen(),
+  List<Widget> get _screens => [
+    TabHomeScreen(onPlanJourneyTap: () => setState(() => _currentIndex = 1)),
+    const TabPlanJourneyScreen(),
+    const TabSafetyScoreScreen(),
+    const TabGuardianScreen(),
   ];
 
   @override

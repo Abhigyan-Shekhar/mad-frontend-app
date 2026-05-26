@@ -6,7 +6,8 @@ import '../services/supabase_service.dart';
 import '../widgets/safe_header.dart';
 
 class TabHomeScreen extends StatefulWidget {
-  const TabHomeScreen({super.key});
+  final VoidCallback? onPlanJourneyTap;
+  const TabHomeScreen({super.key, this.onPlanJourneyTap});
 
   @override
   State<TabHomeScreen> createState() => _TabHomeScreenState();
@@ -94,7 +95,7 @@ class _TabHomeScreenState extends State<TabHomeScreen> {
               const SizedBox(height: 24),
 
               // CTA buttons
-              _SlateButton(label: 'Get Started', icon: Icons.bolt_rounded, onTap: () {}),
+              _SlateButton(label: 'Get Started', icon: Icons.bolt_rounded, onTap: widget.onPlanJourneyTap ?? () {}),
               const SizedBox(height: 12),
               OutlinedButton(
                 onPressed: () {},
@@ -193,7 +194,7 @@ class _TabHomeScreenState extends State<TabHomeScreen> {
                       )),
                     ]),
                     const SizedBox(height: 16),
-                    _SlateButton(label: 'Plan Your Journey', icon: Icons.chevron_right, onTap: () {}),
+                    _SlateButton(label: 'Plan Your Journey', icon: Icons.chevron_right, onTap: widget.onPlanJourneyTap ?? () {}),
                   ],
                 ),
               ),
