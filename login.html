@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeRoute - Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Supabase JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="bg-gray-50 flex flex-col min-h-screen">
+
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="index.html" class="flex items-center gap-2">
+        <div class="bg-gradient-to-br from-slate-700 to-slate-900 rounded-xl p-2 shadow-md">
+          <i data-lucide="map-pin" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <div class="text-[9px] text-gray-500 uppercase tracking-widest font-bold">SafeRoute</div>
+          <div class="text-xs font-semibold text-gray-800 -mt-0.5">Authentication</div>
+        </div>
+      </a>
+    </div>
+  </header>
+
+  <main class="max-w-md mx-auto px-4 py-12 flex-grow w-full flex flex-col justify-center animate-fadeIn">
+    
+    <div class="bg-white rounded-2xl shadow-xl border border-gray-200 p-8">
+      <div class="flex justify-center mb-6">
+        <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+          <i data-lucide="shield" class="w-8 h-8 text-blue-600"></i>
+        </div>
+      </div>
+      
+      <h2 class="text-2xl font-bold text-center text-gray-900 mb-2">Welcome Back</h2>
+      <p class="text-center text-gray-500 mb-8 text-sm">Sign in or create an account to track your safe routes.</p>
+
+      <form id="authForm" class="space-y-4">
+        <div id="errorBox" class="hidden bg-red-50 text-red-700 p-3 rounded-lg text-sm mb-4 border border-red-200"></div>
+        <div id="successBox" class="hidden bg-emerald-50 text-emerald-700 p-3 rounded-lg text-sm mb-4 border border-emerald-200"></div>
+
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Email</label>
+          <input type="email" id="email" required class="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none" placeholder="you@example.com">
+        </div>
+        
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Password</label>
+          <input type="password" id="password" required class="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none" placeholder="••••••••">
+        </div>
+
+        <div class="pt-4 flex flex-col gap-3">
+          <button type="button" id="loginBtn" class="w-full px-6 py-4 bg-slate-800 text-white rounded-xl font-semibold shadow-lg hover:bg-slate-900 transition-all duration-300 active:scale-95 flex justify-center items-center gap-2">
+            Sign In
+          </button>
+          
+          <div class="relative flex items-center py-2">
+            <div class="flex-grow border-t border-gray-300"></div>
+            <span class="flex-shrink-0 mx-4 text-gray-400 text-sm">or</span>
+            <div class="flex-grow border-t border-gray-300"></div>
+          </div>
+
+          <button type="button" id="signupBtn" class="w-full px-6 py-4 bg-white border-2 border-slate-800 text-slate-800 rounded-xl font-semibold hover:bg-slate-50 transition-all duration-300 active:scale-95 flex justify-center items-center gap-2">
+            Create Account
+          </button>
+        </div>
+      </form>
+    </div>
+
+  </main>
+
+  <script src="auth.js"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+name: saferoute
+description: "SafeRoute - Smart Safety Navigation for Bengaluru"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  supabase_flutter: ^2.12.4
+  flutter_dotenv: ^6.0.1
+  http: ^1.6.0
+  flutter_map: ^8.3.0
+  latlong2: ^0.9.1
+  geolocator: ^13.0.0
+  permission_handler: ^11.0.0
+  google_fonts: ^6.2.1
+  flutter_animate: ^4.5.0
+  share_plus: ^10.1.4
+  url_launcher: ^6.3.2
+  intl: ^0.20.2
+  flutter_rating_bar: ^4.0.1
+  percent_indicator: ^4.2.3
+  cached_network_image: ^3.4.1
+  shimmer: ^3.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
