@@ -93,3 +93,5 @@ async function checkAuth() {
     window.location.href = "login.html";
   }
 }
+
+checkAuth();
