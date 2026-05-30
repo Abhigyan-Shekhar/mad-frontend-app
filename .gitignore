@@ -6,3 +6,8 @@
 # OS generated files
 .DS_Store
 Thumbs.db
+._*
+
+# Local tooling state
+.superpowers/
+.tools/

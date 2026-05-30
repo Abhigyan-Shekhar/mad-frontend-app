@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/location_service.dart';
 import '../services/mapbox_service.dart';
+import '../services/navigation_session_service.dart';
 import '../services/supabase_service.dart';
 import '../widgets/saferoute_appbar.dart';
 
@@ -27,6 +28,7 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
   List<Map<String, dynamic>> _trips = const [];
   List<Map<String, dynamic>> _routeHazards = const [];
   Map<String, dynamic>? _activeTrip;
+  Map<String, dynamic>? _latestAnalysis;
   Map<String, dynamic>? _latestPing;
   LatLng? _currentPos;
   List<LatLng> _routePoints = const [];
@@ -56,8 +58,12 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
       final contacts = await _svc.getEmergencyContacts();
       final trips = await _svc.getMyTrips();
       final active = await _svc.getActiveTrip();
-      final latest =
-          active == null ? null : await _svc.getLatestTripPing(active['id']);
+      final latest = active == null
+          ? null
+          : await _svc.getLatestTripPing(active['id']);
+      final latestAnalysis = await _svc.getLatestRouteAnalysis(
+        tripId: active?['id']?.toString(),
+      );
       final hazards = await _svc.getActiveHazards();
 
       var routePoints = <LatLng>[];
@@ -72,7 +78,13 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
             start: start,
             end: end,
           );
-          if (routes.isNotEmpty) routePoints = routes.first.points;
+          if (routes.isNotEmpty) {
+            routePoints = routes.first.points;
+            NavigationSessionService.instance.activateRoute(
+              routes.first,
+              initialLocation: current,
+            );
+          }
         } catch (_) {
           // Use the direct start/end line when routing is unavailable.
         }
@@ -90,6 +102,7 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
         _contacts = contacts;
         _trips = trips;
         _activeTrip = active;
+        _latestAnalysis = latestAnalysis;
         _latestPing = latest;
         _currentPos = current;
         _routePoints = routePoints;
@@ -148,27 +161,31 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
 
   void _startDeviceTracking() {
     _positionSub?.cancel();
-    _positionSub = LocationService.positionStream().listen((position) async {
-      final tripId = _activeTrip?['id']?.toString();
-      if (tripId == null) return;
-      final speedKmh = (position.speed * 3.6).clamp(0, 300).toDouble();
-      final point = LatLng(position.latitude, position.longitude);
-      if (mounted) setState(() => _currentPos = point);
-      await _svc.sendLocationPing(
-        tripId: tripId,
-        lat: point.latitude,
-        lng: point.longitude,
-        speed: speedKmh,
-      );
-    }, onError: (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString()),
-          backgroundColor: const Color(0xFFEF4444),
-        ),
-      );
-    });
+    _positionSub = LocationService.positionStream().listen(
+      (position) async {
+        final tripId = _activeTrip?['id']?.toString();
+        if (tripId == null) return;
+        final speedKmh = (position.speed * 3.6).clamp(0, 300).toDouble();
+        final point = LatLng(position.latitude, position.longitude);
+        if (mounted) setState(() => _currentPos = point);
+        NavigationSessionService.instance.updateWithLocation(point);
+        await _svc.sendLocationPing(
+          tripId: tripId,
+          lat: point.latitude,
+          lng: point.longitude,
+          speed: speedKmh,
+        );
+      },
+      onError: (error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error.toString()),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _showStartTripDialog() async {
@@ -265,6 +282,7 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
     setState(() => _tripLoading = true);
     try {
       await _svc.endTrip(trip['id'].toString());
+      NavigationSessionService.instance.clear();
       await _positionSub?.cancel();
       await _pingSub?.cancel();
       await _load();
@@ -309,6 +327,7 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
                 lng: point.longitude,
                 tripId: _activeTrip?['id']?.toString(),
               );
+              NavigationSessionService.instance.markEmergencyActive();
               await _load();
               if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
@@ -318,7 +337,10 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
                 ),
               );
             },
-            child: const Text('Send SOS', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Send SOS',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -453,8 +475,10 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
                 );
                 await _load();
               },
-              child:
-                  const Text('Report', style: TextStyle(color: Colors.white)),
+              child: const Text(
+                'Report',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         ),
@@ -486,7 +510,9 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
     final body = point == null
         ? 'I am using SafeRoute.'
         : 'I am using SafeRoute. Current location: https://maps.google.com/?q=${point.latitude},${point.longitude}';
-    await launchUrl(Uri(scheme: 'sms', path: phone, queryParameters: {'body': body}));
+    await launchUrl(
+      Uri(scheme: 'sms', path: phone, queryParameters: {'body': body}),
+    );
   }
 
   Map<String, dynamic>? get _primaryContact {
@@ -498,14 +524,14 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
   }
 
   LatLng _tripStart(Map<String, dynamic> trip) => LatLng(
-        (trip['start_lat'] as num).toDouble(),
-        (trip['start_lng'] as num).toDouble(),
-      );
+    (trip['start_lat'] as num).toDouble(),
+    (trip['start_lng'] as num).toDouble(),
+  );
 
   LatLng _tripEnd(Map<String, dynamic> trip) => LatLng(
-        (trip['end_lat'] as num).toDouble(),
-        (trip['end_lng'] as num).toDouble(),
-      );
+    (trip['end_lat'] as num).toDouble(),
+    (trip['end_lng'] as num).toDouble(),
+  );
 
   LatLng? _pingPoint(Map<String, dynamic>? ping) {
     final lat = (ping?['lat'] as num?)?.toDouble();
@@ -519,16 +545,18 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
     List<Map<String, dynamic>> hazards,
   ) {
     if (points.isEmpty) return const [];
-    return hazards.where((hazard) {
-      final lat = (hazard['lat'] as num?)?.toDouble();
-      final lng = (hazard['lng'] as num?)?.toDouble();
-      if (lat == null || lng == null) return false;
-      final hazardPoint = LatLng(lat, lng);
-      return points.any(
-        (point) =>
-            _distance.as(LengthUnit.Meter, point, hazardPoint) <= 500,
-      );
-    }).toList(growable: false);
+    return hazards
+        .where((hazard) {
+          final lat = (hazard['lat'] as num?)?.toDouble();
+          final lng = (hazard['lng'] as num?)?.toDouble();
+          if (lat == null || lng == null) return false;
+          final hazardPoint = LatLng(lat, lng);
+          return points.any(
+            (point) =>
+                _distance.as(LengthUnit.Meter, point, hazardPoint) <= 500,
+          );
+        })
+        .toList(growable: false);
   }
 
   String _tripTitle() {
@@ -550,14 +578,18 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
   }
 
   String _takenDuration() {
-    final created = DateTime.tryParse(_activeTrip?['created_at']?.toString() ?? '');
+    final created = DateTime.tryParse(
+      _activeTrip?['created_at']?.toString() ?? '',
+    );
     if (created == null) return '--';
     final minutes = DateTime.now().difference(created.toLocal()).inMinutes;
     return '${minutes.clamp(0, 999)}m';
   }
 
   double _speedKmh() {
-    return ((_latestPing?['speed'] as num?)?.toDouble() ?? 0).clamp(0, 300).toDouble();
+    return ((_latestPing?['speed'] as num?)?.toDouble() ?? 0)
+        .clamp(0, 300)
+        .toDouble();
   }
 
   double? _distanceLeftKm() {
@@ -588,6 +620,11 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final liveSnapshot = NavigationSessionService.instance.currentSnapshot;
+    final currentInstruction =
+        NavigationSessionService.instance.currentInstruction;
+    final nextInstruction = NavigationSessionService.instance.nextInstruction;
+    final emergencyActive = liveSnapshot?.isEmergencyActive ?? false;
     final tripActive = _activeTrip != null;
     final current = _currentPos ?? const LatLng(12.9716, 77.5946);
     final distanceLeft = _distanceLeftKm();
@@ -647,6 +684,18 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
                                       color: Color(0xFF111827),
                                     ),
                                   ),
+                                  if (_latestAnalysis != null) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Safety score ${((_latestAnalysis!['score'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)}/100'
+                                      '${_latestAnalysis!['ward_name'] == null ? '' : ' · ${_latestAnalysis!['ward_name']}'}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF6B7280),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -670,8 +719,9 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
                                         shape: BoxShape.circle,
                                         boxShadow: [
                                           BoxShadow(
-                                            color: const Color(0xFF10B981)
-                                                .withOpacity(0.5),
+                                            color: const Color(
+                                              0xFF10B981,
+                                            ).withOpacity(0.5),
                                             blurRadius: 6,
                                           ),
                                         ],
@@ -751,10 +801,10 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
                                         ),
                                       ),
                                     ..._routeHazards.map((hazard) {
-                                      final lat =
-                                          (hazard['lat'] as num).toDouble();
-                                      final lng =
-                                          (hazard['lng'] as num).toDouble();
+                                      final lat = (hazard['lat'] as num)
+                                          .toDouble();
+                                      final lng = (hazard['lng'] as num)
+                                          .toDouble();
                                       return Marker(
                                         point: LatLng(lat, lng),
                                         width: 40,
@@ -772,14 +822,79 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
+                        if (tripActive && currentInstruction != null)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: emergencyActive
+                                  ? const Color(0xFFFEF2F2)
+                                  : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: emergencyActive
+                                    ? const Color(0xFFFCA5A5)
+                                    : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  emergencyActive
+                                      ? 'Emergency Tracking Active'
+                                      : 'Live Maneuvers',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: emergencyActive
+                                        ? const Color(0xFFB91C1C)
+                                        : const Color(0xFF64748B),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Now: $currentInstruction',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF111827),
+                                  ),
+                                ),
+                                if (nextInstruction != null)
+                                  Text(
+                                    'Next: $nextInstruction',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF475569),
+                                    ),
+                                  ),
+                                if (liveSnapshot != null) ...[
+                                  const SizedBox(height: 10),
+                                  LinearProgressIndicator(
+                                    value: liveSnapshot.state.progressFraction,
+                                    minHeight: 8,
+                                    borderRadius: BorderRadius.circular(999),
+                                    backgroundColor: const Color(0xFFE2E8F0),
+                                    color: liveSnapshot.state.hasArrived
+                                        ? const Color(0xFF059669)
+                                        : const Color(0xFF2563EB),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        if (tripActive && currentInstruction != null)
+                          const SizedBox(height: 16),
                         if (tripActive)
                           Container(
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF9FAFB),
                               borderRadius: BorderRadius.circular(12),
-                              border:
-                                  Border.all(color: const Color(0xFFE5E7EB)),
+                              border: Border.all(
+                                color: const Color(0xFFE5E7EB),
+                              ),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -833,7 +948,9 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          tripActive ? 'Journey is Active' : 'No Journey Started',
+                          tripActive
+                              ? 'Journey is Active'
+                              : 'No Journey Started',
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
@@ -882,8 +999,9 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF1E293B),
                                   foregroundColor: Colors.white,
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 14),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
@@ -894,8 +1012,10 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
                             Expanded(
                               child: OutlinedButton.icon(
                                 onPressed: _messagePrimary,
-                                icon:
-                                    const Icon(Icons.message_outlined, size: 18),
+                                icon: const Icon(
+                                  Icons.message_outlined,
+                                  size: 18,
+                                ),
                                 label: const Text(
                                   'Message',
                                   style: TextStyle(fontWeight: FontWeight.w700),
@@ -906,8 +1026,9 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
                                     color: Color(0xFFD1D5DB),
                                     width: 2,
                                   ),
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 14),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
@@ -975,9 +1096,7 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
                             ),
                           )
                         else if (_routeHazards.isEmpty)
-                          const _EmptyPanel(
-                            text: 'No active route alerts.',
-                          )
+                          const _EmptyPanel(text: 'No active route alerts.')
                         else
                           ..._routeHazards.map(
                             (hazard) => Padding(
@@ -1058,7 +1177,8 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
                           ),
                         if (!_loading && _contacts.isEmpty)
                           const _EmptyPanel(
-                            text: 'No guardians added yet.\nTap + Add to add one.',
+                            text:
+                                'No guardians added yet.\nTap + Add to add one.',
                           ),
                         ..._contacts.map(
                           (contact) => Padding(
@@ -1113,8 +1233,9 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
                                     ),
                                   ),
                                   IconButton(
-                                    onPressed: () =>
-                                        _deleteContact(contact['id'].toString()),
+                                    onPressed: () => _deleteContact(
+                                      contact['id'].toString(),
+                                    ),
                                     icon: const Icon(
                                       Icons.delete_outline,
                                       color: Color(0xFFEF4444),
@@ -1162,7 +1283,9 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
                           child: ElevatedButton.icon(
                             onPressed: _tripLoading
                                 ? null
-                                : (tripActive ? _endTrip : _showStartTripDialog),
+                                : (tripActive
+                                      ? _endTrip
+                                      : _showStartTripDialog),
                             icon: Icon(
                               tripActive
                                   ? Icons.stop_rounded
@@ -1278,11 +1401,8 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
   }
 }
 
-Widget _vDivider() => Container(
-      height: 30,
-      width: 1,
-      color: const Color(0xFFE5E7EB),
-    );
+Widget _vDivider() =>
+    Container(height: 30, width: 1, color: const Color(0xFFE5E7EB));
 
 class _MapPin extends StatelessWidget {
   final Color color;
@@ -1292,16 +1412,14 @@ class _MapPin extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 3),
-          boxShadow: [
-            BoxShadow(color: color.withOpacity(0.4), blurRadius: 10),
-          ],
-        ),
-        child: Icon(icon, color: Colors.white, size: 20),
-      );
+    decoration: BoxDecoration(
+      color: color,
+      shape: BoxShape.circle,
+      border: Border.all(color: Colors.white, width: 3),
+      boxShadow: [BoxShadow(color: color.withOpacity(0.4), blurRadius: 10)],
+    ),
+    child: Icon(icon, color: Colors.white, size: 20),
+  );
 }
 
 class _TripStat extends StatelessWidget {
@@ -1311,26 +1429,26 @@ class _TripStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 10,
-              color: Color(0xFF6B7280),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF111827),
-            ),
-          ),
-        ],
-      );
+    children: [
+      Text(
+        label,
+        style: const TextStyle(
+          fontSize: 10,
+          color: Color(0xFF6B7280),
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      const SizedBox(height: 3),
+      Text(
+        value,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF111827),
+        ),
+      ),
+    ],
+  );
 }
 
 class _StatusRow extends StatelessWidget {
@@ -1340,34 +1458,34 @@ class _StatusRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF9FAFB),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF9FAFB),
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: const Color(0xFFE5E7EB)),
+    ),
+    child: Row(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            color: Color(0xFF374151),
+            fontWeight: FontWeight.w500,
+          ),
         ),
-        child: Row(
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 13,
-                color: Color(0xFF374151),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const Spacer(),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF111827),
-              ),
-            ),
-          ],
+        const Spacer(),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF111827),
+          ),
         ),
-      );
+      ],
+    ),
+  );
 }
 
 class _StatusRowColored extends StatelessWidget {
@@ -1387,34 +1505,34 @@ class _StatusRowColored extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: border),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    decoration: BoxDecoration(
+      color: bg,
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: border),
+    ),
+    child: Row(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            color: Color(0xFF374151),
+            fontWeight: FontWeight.w500,
+          ),
         ),
-        child: Row(
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 13,
-                color: Color(0xFF374151),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const Spacer(),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: textColor,
-              ),
-            ),
-          ],
+        const Spacer(),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: textColor,
+          ),
         ),
-      );
+      ],
+    ),
+  );
 }
 
 class _HazardAlert extends StatelessWidget {
@@ -1488,21 +1606,21 @@ class _EmptyPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF9FAFB),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-        ),
-        child: Text(
-          text,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Color(0xFF6B7280),
-            fontSize: 13,
-            height: 1.4,
-          ),
-        ),
-      );
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF9FAFB),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFFE5E7EB)),
+    ),
+    child: Text(
+      text,
+      textAlign: TextAlign.center,
+      style: const TextStyle(
+        color: Color(0xFF6B7280),
+        fontSize: 13,
+        height: 1.4,
+      ),
+    ),
+  );
 }
