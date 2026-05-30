@@ -1,5 +1,28 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+class SupabaseTableGuard {
+  static bool isMissingTableError(Object error, String tableName) {
+    if (error is! PostgrestException) return false;
+    if (error.code != 'PGRST205') return false;
+    return error.message.contains("public.$tableName");
+  }
+
+  static T fallbackIfMissingTable<T>(
+    Object error, {
+    required String tableName,
+    required T fallback,
+  }) {
+    if (isMissingTableError(error, tableName)) {
+      return fallback;
+    }
+    throw error;
+  }
+}
+
+String deriveTripStatusAfterSos({required String currentStatus}) {
+  return currentStatus == 'completed' ? 'completed' : 'sos_triggered';
+}
+
 class SupabaseService {
   static SupabaseService? _instance;
   static SupabaseService get instance => _instance ??= SupabaseService._();
@@ -56,23 +79,30 @@ class SupabaseService {
       throw StateError('End the current active trip before starting another.');
     }
 
-    final resp = await _client.from('trips').insert({
-      'user_id': _userId,
-      'start_lat': startLat,
-      'start_lng': startLng,
-      'end_lat': endLat,
-      'end_lng': endLng,
-      'destination_name': destinationName,
-      'status': 'active',
-    }).select().single();
+    final resp = await _client
+        .from('trips')
+        .insert({
+          'user_id': _userId,
+          'start_lat': startLat,
+          'start_lng': startLng,
+          'end_lat': endLat,
+          'end_lng': endLng,
+          'destination_name': destinationName,
+          'status': 'active',
+        })
+        .select()
+        .single();
     return Map<String, dynamic>.from(resp);
   }
 
   Future<void> endTrip(String tripId) async {
-    await _client.from('trips').update({
-      'status': 'completed',
-      'ended_at': DateTime.now().toIso8601String(),
-    }).eq('id', tripId);
+    await _client
+        .from('trips')
+        .update({
+          'status': 'completed',
+          'ended_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', tripId);
   }
 
   Future<List<Map<String, dynamic>>> getMyTrips() async {
@@ -141,21 +171,42 @@ class SupabaseService {
     required double lng,
     String? tripId,
   }) async {
-    final row = await _client.from('sos_alerts').insert({
-      'user_id': _userId,
-      'trip_id': tripId,
-      'lat': lat,
-      'lng': lng,
-      'is_resolved': false,
-    }).select().single();
+    if (tripId != null) {
+      final trip = await _client
+          .from('trips')
+          .select('status')
+          .eq('id', tripId)
+          .maybeSingle();
+      final currentStatus = trip?['status']?.toString() ?? 'active';
+      await _client
+          .from('trips')
+          .update({
+            'status': deriveTripStatusAfterSos(currentStatus: currentStatus),
+          })
+          .eq('id', tripId);
+    }
+    final row = await _client
+        .from('sos_alerts')
+        .insert({
+          'user_id': _userId,
+          'trip_id': tripId,
+          'lat': lat,
+          'lng': lng,
+          'is_resolved': false,
+        })
+        .select()
+        .single();
     return Map<String, dynamic>.from(row);
   }
 
   Future<void> resolveSOS(String alertId) async {
-    await _client.from('sos_alerts').update({
-      'is_resolved': true,
-      'resolved_at': DateTime.now().toIso8601String(),
-    }).eq('id', alertId);
+    await _client
+        .from('sos_alerts')
+        .update({
+          'is_resolved': true,
+          'resolved_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', alertId);
   }
 
   // ─── HAZARDS ─────────────────────────────────────────────────
@@ -187,7 +238,8 @@ class SupabaseService {
 
   /// Realtime stream for new hazards
   RealtimeChannel listenForNewHazards(
-      void Function(Map<String, dynamic>) onNew) {
+    void Function(Map<String, dynamic>) onNew,
+  ) {
     return _client
         .channel('public:hazards')
         .onPostgresChanges(
@@ -225,5 +277,140 @@ class SupabaseService {
 
   Future<void> deleteEmergencyContact(String id) async {
     await _client.from('emergency_contacts').delete().eq('id', id);
+  }
+
+  // ─── ROUTE ANALYSIS / SAFETY DATA ───────────────────────────
+  Future<void> saveRouteAnalysis({
+    required String routeId,
+    required String destinationName,
+    String? tripId,
+    required double score,
+    required double baseScore,
+    required double hazardPenalty,
+    required String coverage,
+    required List<String> highlights,
+    required List<String> hazardTypes,
+    String? wardName,
+    String? streetSummary,
+  }) async {
+    try {
+      await _client.from('route_analyses').insert({
+        'user_id': _userId,
+        'trip_id': tripId,
+        'route_id': routeId,
+        'destination_name': destinationName,
+        'score': score,
+        'base_score': baseScore,
+        'hazard_penalty': hazardPenalty,
+        'coverage': coverage,
+        'highlights': highlights,
+        'hazard_types': hazardTypes,
+        if (wardName != null) 'ward_name': wardName,
+        if (streetSummary != null) 'street_summary': streetSummary,
+      });
+    } catch (error) {
+      SupabaseTableGuard.fallbackIfMissingTable<void>(
+        error,
+        tableName: 'route_analyses',
+        fallback: null,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>?> getLatestRouteAnalysis({String? tripId}) async {
+    try {
+      final query = tripId == null
+          ? _client
+                .from('route_analyses')
+                .select()
+                .eq('user_id', _userId)
+                .order('created_at', ascending: false)
+                .limit(1)
+          : _client
+                .from('route_analyses')
+                .select()
+                .eq('user_id', _userId)
+                .eq('trip_id', tripId)
+                .order('created_at', ascending: false)
+                .limit(1);
+      final rows = await query;
+      if (rows.isEmpty) return null;
+      return Map<String, dynamic>.from(rows.first);
+    } catch (error) {
+      return SupabaseTableGuard.fallbackIfMissingTable<Map<String, dynamic>?>(
+        error,
+        tableName: 'route_analyses',
+        fallback: null,
+      );
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getWardSafetyScores({
+    int limit = 20,
+  }) async {
+    try {
+      final rows = await _client
+          .from('ward_safety_scores')
+          .select()
+          .order('safety_score', ascending: true)
+          .limit(limit);
+      return rows.map((row) => Map<String, dynamic>.from(row)).toList();
+    } catch (error) {
+      return SupabaseTableGuard.fallbackIfMissingTable<
+        List<Map<String, dynamic>>
+      >(error, tableName: 'ward_safety_scores', fallback: const []);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getStreetSegments({
+    String? wardName,
+    int limit = 20,
+  }) async {
+    try {
+      final query = wardName == null || wardName.trim().isEmpty
+          ? _client
+                .from('street_segments')
+                .select()
+                .order('created_at', ascending: false)
+                .limit(limit)
+          : _client
+                .from('street_segments')
+                .select()
+                .filter('ward_name', 'ilike', '%${wardName.trim()}%')
+                .order('created_at', ascending: false)
+                .limit(limit);
+      final rows = await query;
+      return rows.map((row) => Map<String, dynamic>.from(row)).toList();
+    } catch (error) {
+      return SupabaseTableGuard.fallbackIfMissingTable<
+        List<Map<String, dynamic>>
+      >(error, tableName: 'street_segments', fallback: const []);
+    }
+  }
+
+  Future<void> upsertWardSafetyScores(List<Map<String, dynamic>> scores) async {
+    if (scores.isEmpty) return;
+    try {
+      await _client.from('ward_safety_scores').upsert(scores);
+    } catch (error) {
+      SupabaseTableGuard.fallbackIfMissingTable<void>(
+        error,
+        tableName: 'ward_safety_scores',
+        fallback: null,
+      );
+    }
+  }
+
+  Future<void> upsertStreetSegments(List<Map<String, dynamic>> segments) async {
+    if (segments.isEmpty) return;
+    try {
+      await _client.from('street_segments').upsert(segments);
+    } catch (error) {
+      SupabaseTableGuard.fallbackIfMissingTable<void>(
+        error,
+        tableName: 'street_segments',
+        fallback: null,
+      );
+    }
   }
 }

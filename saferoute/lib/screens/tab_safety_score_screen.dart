@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:share_plus/share_plus.dart';
@@ -21,6 +23,7 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
   bool _loading = true;
   String? _error;
   Map<String, dynamic>? _activeTrip;
+  Map<String, dynamic>? _latestAnalysis;
   List<Map<String, dynamic>> _routeHazards = const [];
   List<LatLng> _routePoints = const [];
   double _score = 0;
@@ -56,12 +59,15 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
     try {
       final trip = await SupabaseService.instance.getActiveTrip();
       if (trip == null) {
+        final latestAnalysis = await SupabaseService.instance.getLatestRouteAnalysis();
         if (!mounted) return;
         setState(() {
           _activeTrip = null;
+          _latestAnalysis = latestAnalysis;
           _routeHazards = const [];
           _routePoints = const [];
-          _score = 0;
+          _score =
+              (latestAnalysis?['score'] as num?)?.toDouble() ?? 0;
           _loading = false;
         });
         _progressCtrl.forward(from: 0);
@@ -88,23 +94,17 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
         // A direct start/end line still lets safety scoring continue.
       }
 
+      final latestAnalysis = await SupabaseService.instance
+          .getLatestRouteAnalysis(tripId: trip['id']?.toString());
       final hazards = await SupabaseService.instance.getActiveHazards();
       final nearRoute = _hazardsNearRoute(points, hazards);
-      final destinationName =
-          trip['destination_name']?.toString() ?? 'Active Route';
-      final baseScore = await BbmpService.instance.routeSafetyScore(
-        destinationName,
-        destinationName,
-      );
-      final penalty = nearRoute.fold<double>(
-        0,
-        (sum, hazard) => sum + _hazardPenalty(hazard['hazard_type']),
-      );
-      final score = (baseScore - penalty).clamp(0, 100).toDouble();
+      final score = (latestAnalysis?['score'] as num?)?.toDouble() ??
+          await _fallbackScore(trip, nearRoute);
 
       if (!mounted) return;
       setState(() {
         _activeTrip = trip;
+        _latestAnalysis = latestAnalysis;
         _routeHazards = nearRoute;
         _routePoints = points;
         _score = score;
@@ -156,7 +156,12 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
 
   String _statusText() {
     if (_loading) return 'Loading route safety data...';
-    if (_activeTrip == null) return 'Start navigation to calculate route safety.';
+    if (_activeTrip == null && _latestAnalysis == null) {
+      return 'Start navigation to calculate route safety.';
+    }
+    if (_activeTrip == null) {
+      return 'Latest recorded route score from your most recent SafeRoute analysis.';
+    }
     final destination = _activeTrip!['destination_name']?.toString() ?? 'route';
     if (_score >= 75) return 'Safer route conditions toward $destination';
     if (_score >= 50) return 'Moderate risk detected toward $destination';
@@ -164,6 +169,15 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
   }
 
   String _forecastText() {
+    if (_activeTrip == null && _latestAnalysis != null) {
+      final hazardTypes = (_latestAnalysis!['hazard_types'] as List<dynamic>? ?? const [])
+          .map((entry) => entry.toString())
+          .toList(growable: false);
+      if (hazardTypes.isEmpty) {
+        return 'Most recent saved route had no hazard categories recorded.';
+      }
+      return 'Latest saved route hazards: ${hazardTypes.join(', ')}.';
+    }
     if (_activeTrip == null) return 'No active route is currently being tracked.';
     if (_routeHazards.isEmpty) {
       return 'No active community hazards are currently reported along this route.';
@@ -179,6 +193,9 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
   }
 
   String _recommendationText() {
+    if (_activeTrip == null && _latestAnalysis != null) {
+      return 'Plan another trip to refresh live analysis, or review your saved route context.';
+    }
     if (_activeTrip == null) return 'Plan a route first, then review live risk.';
     if (_score >= 75) return 'Continue with guardian tracking enabled.';
     if (_score >= 50) {
@@ -189,12 +206,29 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
 
   Future<void> _shareRoute() async {
     final trip = _activeTrip;
-    if (trip == null) return;
-    final destination = trip['destination_name']?.toString() ?? 'destination';
+    final destination = trip?['destination_name']?.toString() ??
+        _latestAnalysis?['destination_name']?.toString() ??
+        'destination';
     await Share.share(
       'SafeRoute trip to $destination. Safety score: ${_score.toStringAsFixed(0)}/100.',
       subject: 'SafeRoute Trip',
     );
+  }
+
+  Future<double> _fallbackScore(
+    Map<String, dynamic> trip,
+    List<Map<String, dynamic>> nearRoute,
+  ) async {
+    final destinationName = trip['destination_name']?.toString() ?? 'Active Route';
+    final baseScore = await BbmpService.instance.routeSafetyScoreCached(
+      destinationName,
+      destinationName,
+    );
+    final penalty = nearRoute.fold<double>(
+      0,
+      (sum, hazard) => sum + _hazardPenalty(hazard['hazard_type']),
+    );
+    return (baseScore - penalty).clamp(0, 100).toDouble();
   }
 
   @override
@@ -207,7 +241,11 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
         : _score >= 50
             ? const Color(0xFFF59E0B)
             : const Color(0xFFEF4444);
-    final area = _activeTrip?['destination_name']?.toString() ?? 'No Route';
+    final area = _activeTrip?['destination_name']?.toString() ??
+        _latestAnalysis?['destination_name']?.toString() ??
+        'No Route';
+    final wardContext = _latestAnalysis?['ward_name']?.toString();
+    final streetSummary = _latestAnalysis?['street_summary']?.toString();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
@@ -465,6 +503,19 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
                     title: 'Recommendation',
                     body: _recommendationText(),
                   ),
+                  if (wardContext != null || streetSummary != null) ...[
+                    const SizedBox(height: 12),
+                    _AlertCard(
+                      bgColor: const Color(0xFFF0FDF4),
+                      borderColor: const Color(0xFFBBF7D0),
+                      iconBg: const Color(0xFFDCFCE7),
+                      iconColor: const Color(0xFF15803D),
+                      icon: Icons.map_rounded,
+                      title: 'Bengaluru Context',
+                      body:
+                          '${wardContext ?? 'Ward context unavailable'}${streetSummary == null || streetSummary.isEmpty ? '' : ' · Streets: $streetSummary'}',
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(20),
@@ -853,7 +904,8 @@ class _RoutePainter extends CustomPainter {
       return Offset(x, y);
     }
 
-    final path = Path()..moveTo(project(points.first).dx, project(points.first).dy);
+    final path = ui.Path()
+      ..moveTo(project(points.first).dx, project(points.first).dy);
     for (final point in points.skip(1)) {
       final offset = project(point);
       path.lineTo(offset.dx, offset.dy);

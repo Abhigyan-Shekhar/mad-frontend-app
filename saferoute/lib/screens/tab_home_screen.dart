@@ -15,9 +15,11 @@ class TabHomeScreen extends StatefulWidget {
 
 class _TabHomeScreenState extends State<TabHomeScreen> {
   Map<String, WardScore> _wardScores = {};
+  List<Map<String, dynamic>> _topRiskWards = [];
   List<Map<String, dynamic>> _hazards = [];
   List<Map<String, dynamic>> _trips = [];
   List<Map<String, dynamic>> _contacts = [];
+  Map<String, dynamic>? _latestAnalysis;
   LatLng? _currentPoint;
   bool _loading = true;
 
@@ -29,10 +31,12 @@ class _TabHomeScreenState extends State<TabHomeScreen> {
 
   Future<void> _loadScores() async {
     try {
-      final scores = await BbmpService.instance.getWardScores();
+      final scores = await BbmpService.instance.getCachedWardScores();
       final hazards = await SupabaseService.instance.getActiveHazards();
       final trips = await SupabaseService.instance.getMyTrips();
       final contacts = await SupabaseService.instance.getEmergencyContacts();
+      final latestAnalysis = await SupabaseService.instance.getLatestRouteAnalysis();
+      final topRiskWards = await BbmpService.instance.topRiskWardsCached(limit: 3);
       LatLng? currentPoint;
       try {
         final position = await LocationService.currentPosition();
@@ -46,6 +50,8 @@ class _TabHomeScreenState extends State<TabHomeScreen> {
           _hazards = hazards;
           _trips = trips;
           _contacts = contacts;
+          _latestAnalysis = latestAnalysis;
+          _topRiskWards = topRiskWards;
           _currentPoint = currentPoint;
           _loading = false;
         });
@@ -256,6 +262,76 @@ class _TabHomeScreenState extends State<TabHomeScreen> {
                 const SizedBox(height: 24),
                 Text('Live BBMP Data · ${_wardScores.length} wards tracked',
                     style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF), fontWeight: FontWeight.w500)),
+              ],
+              if (_latestAnalysis != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Latest Saved Route Analysis',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF111827)),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${_latestAnalysis!['destination_name'] ?? 'Route'} · Score ${((_latestAnalysis!['score'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)}/100',
+                        style: const TextStyle(fontSize: 13, color: Color(0xFF374151)),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${_latestAnalysis!['ward_name'] ?? 'Ward context pending'}${_latestAnalysis!['street_summary'] == null ? '' : ' · ${_latestAnalysis!['street_summary']}'}',
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (_topRiskWards.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'BBMP Risk Watch',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF111827)),
+                      ),
+                      const SizedBox(height: 10),
+                      ..._topRiskWards.map(
+                        (ward) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  ward['ward_name']?.toString() ?? 'Unknown ward',
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151)),
+                                ),
+                              ),
+                              Text(
+                                '${((ward['safety_score'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)}/100',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFFB45309), fontWeight: FontWeight.w700),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
 
             ])),

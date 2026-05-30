@@ -174,3 +174,97 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_sos_alert_created
   AFTER INSERT ON public.sos_alerts
   FOR EACH ROW EXECUTE PROCEDURE public.mark_trip_sos();
+
+-- ==========================================
+-- 7. Ward Safety Scores (BBMP-derived safety intelligence)
+-- ==========================================
+CREATE TABLE IF NOT EXISTS public.ward_safety_scores (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    ward_name TEXT NOT NULL UNIQUE,
+    total_grievances INTEGER DEFAULT 0 NOT NULL,
+    road_grievances INTEGER DEFAULT 0 NOT NULL,
+    light_grievances INTEGER DEFAULT 0 NOT NULL,
+    safety_score DOUBLE PRECISION DEFAULT 70 NOT NULL,
+    source_year TEXT,
+    source_dataset TEXT DEFAULT 'bbmp_grievances',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.ward_safety_scores ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated users can read ward safety scores" ON public.ward_safety_scores
+    FOR SELECT USING (auth.role() = 'authenticated');
+
+-- ==========================================
+-- 8. Street Segments (OpenCity street map enrichment)
+-- ==========================================
+CREATE TABLE IF NOT EXISTS public.street_segments (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    ward_name TEXT NOT NULL,
+    ward_number TEXT,
+    street_id TEXT NOT NULL,
+    street_name TEXT,
+    source_url TEXT,
+    geometry_wkt TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    UNIQUE (ward_name, street_id)
+);
+
+ALTER TABLE public.street_segments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated users can read street segments" ON public.street_segments
+    FOR SELECT USING (auth.role() = 'authenticated');
+
+-- ==========================================
+-- 9. Route Analyses (saved route scoring snapshots)
+-- ==========================================
+CREATE TABLE IF NOT EXISTS public.route_analyses (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    trip_id UUID REFERENCES public.trips(id) ON DELETE CASCADE,
+    route_id TEXT NOT NULL,
+    destination_name TEXT,
+    ward_name TEXT,
+    street_summary TEXT,
+    score DOUBLE PRECISION NOT NULL,
+    base_score DOUBLE PRECISION NOT NULL,
+    hazard_penalty DOUBLE PRECISION DEFAULT 0 NOT NULL,
+    coverage TEXT NOT NULL,
+    highlights JSONB DEFAULT '[]'::jsonb NOT NULL,
+    hazard_types JSONB DEFAULT '[]'::jsonb NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.route_analyses ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage their own route analyses" ON public.route_analyses
+    FOR ALL USING (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_route_analyses_user_created_at
+    ON public.route_analyses (user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_ward_safety_scores_safety_score
+    ON public.ward_safety_scores (safety_score ASC);
+
+CREATE INDEX IF NOT EXISTS idx_street_segments_ward_name
+    ON public.street_segments (ward_name);
+
+-- ==========================================
+-- 10. Updated At helper trigger
+-- ==========================================
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS trigger AS $$
+BEGIN
+  NEW.updated_at = timezone('utc'::text, now());
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS set_updated_at_ward_safety_scores ON public.ward_safety_scores;
+CREATE TRIGGER set_updated_at_ward_safety_scores
+  BEFORE UPDATE ON public.ward_safety_scores
+  FOR EACH ROW EXECUTE PROCEDURE public.set_updated_at();
+
+DROP TRIGGER IF EXISTS set_updated_at_street_segments ON public.street_segments;
+CREATE TRIGGER set_updated_at_street_segments
+  BEFORE UPDATE ON public.street_segments
+  FOR EACH ROW EXECUTE PROCEDURE public.set_updated_at();
