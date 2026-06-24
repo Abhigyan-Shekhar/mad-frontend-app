@@ -145,4 +145,18 @@ void main() {
     expect(preview.first.instruction, 'Head north on 6th Cross Road');
     expect(preview.last.instruction, 'Keep left at the junction');
   });
+
+  test(
+    'formats location permission failures into a user-friendly route error',
+    () {
+      final message = formatRoutePlannerError(
+        StateError('Location permission was denied.'),
+      );
+
+      expect(
+        message,
+        'Allow location access so SafeRoute can find the best route from where you are.',
+      );
+    },
+  );
 }

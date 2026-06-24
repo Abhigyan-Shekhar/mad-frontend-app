@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../services/bbmp_service.dart';
 import '../services/mapbox_service.dart';
+import '../services/navigation_session_service.dart';
 import '../services/supabase_service.dart';
 import '../widgets/saferoute_appbar.dart';
 
@@ -58,16 +59,38 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
 
     try {
       final trip = await SupabaseService.instance.getActiveTrip();
+      final liveSnapshot = NavigationSessionService.instance.currentSnapshot;
       if (trip == null) {
-        final latestAnalysis = await SupabaseService.instance.getLatestRouteAnalysis();
+        final latestAnalysis = await SupabaseService.instance
+            .getLatestRouteAnalysis();
+        if (liveSnapshot != null) {
+          final hazards = await SupabaseService.instance.getActiveHazards();
+          final nearRoute = _hazardsNearRoute(
+            liveSnapshot.route.points,
+            hazards,
+          );
+          final score =
+              liveSnapshot.safetyScore ??
+              await _fallbackLiveSessionScore(liveSnapshot, nearRoute);
+          if (!mounted) return;
+          setState(() {
+            _activeTrip = null;
+            _latestAnalysis = latestAnalysis;
+            _routeHazards = nearRoute;
+            _routePoints = liveSnapshot.route.points;
+            _score = score;
+            _loading = false;
+          });
+          _progressCtrl.forward(from: 0);
+          return;
+        }
         if (!mounted) return;
         setState(() {
           _activeTrip = null;
           _latestAnalysis = latestAnalysis;
           _routeHazards = const [];
           _routePoints = const [];
-          _score =
-              (latestAnalysis?['score'] as num?)?.toDouble() ?? 0;
+          _score = (latestAnalysis?['score'] as num?)?.toDouble() ?? 0;
           _loading = false;
         });
         _progressCtrl.forward(from: 0);
@@ -98,7 +121,8 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
           .getLatestRouteAnalysis(tripId: trip['id']?.toString());
       final hazards = await SupabaseService.instance.getActiveHazards();
       final nearRoute = _hazardsNearRoute(points, hazards);
-      final score = (latestAnalysis?['score'] as num?)?.toDouble() ??
+      final score =
+          (latestAnalysis?['score'] as num?)?.toDouble() ??
           await _fallbackScore(trip, nearRoute);
 
       if (!mounted) return;
@@ -125,16 +149,18 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
     List<Map<String, dynamic>> hazards,
   ) {
     if (points.isEmpty) return const [];
-    return hazards.where((hazard) {
-      final lat = (hazard['lat'] as num?)?.toDouble();
-      final lng = (hazard['lng'] as num?)?.toDouble();
-      if (lat == null || lng == null) return false;
-      final hazardPoint = LatLng(lat, lng);
-      return points.any(
-        (point) =>
-            _distance.as(LengthUnit.Meter, point, hazardPoint) <= 350,
-      );
-    }).toList(growable: false);
+    return hazards
+        .where((hazard) {
+          final lat = (hazard['lat'] as num?)?.toDouble();
+          final lng = (hazard['lng'] as num?)?.toDouble();
+          if (lat == null || lng == null) return false;
+          final hazardPoint = LatLng(lat, lng);
+          return points.any(
+            (point) =>
+                _distance.as(LengthUnit.Meter, point, hazardPoint) <= 350,
+          );
+        })
+        .toList(growable: false);
   }
 
   double _hazardPenalty(dynamic hazardType) {
@@ -155,7 +181,16 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
   }
 
   String _statusText() {
+    final liveSnapshot = NavigationSessionService.instance.currentSnapshot;
     if (_loading) return 'Loading route safety data...';
+    if (_activeTrip == null && liveSnapshot != null) {
+      if (_score >= 75)
+        return 'Safer live route conditions toward ${liveSnapshot.destinationName}';
+      if (_score >= 50) {
+        return 'Moderate live route risk detected toward ${liveSnapshot.destinationName}';
+      }
+      return 'High live route risk detected toward ${liveSnapshot.destinationName}';
+    }
     if (_activeTrip == null && _latestAnalysis == null) {
       return 'Start navigation to calculate route safety.';
     }
@@ -169,16 +204,32 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
   }
 
   String _forecastText() {
+    final liveSnapshot = NavigationSessionService.instance.currentSnapshot;
+    if (_activeTrip == null && liveSnapshot != null) {
+      if (_routeHazards.isEmpty) {
+        return 'Guest navigation is active with no nearby community hazards currently reported.';
+      }
+      final grouped = <String, int>{};
+      for (final hazard in _routeHazards) {
+        final type = hazard['hazard_type']?.toString() ?? 'hazard';
+        grouped[type] = (grouped[type] ?? 0) + 1;
+      }
+      return grouped.entries
+          .map((entry) => '${entry.value} ${entry.key} alert(s)')
+          .join(', ');
+    }
     if (_activeTrip == null && _latestAnalysis != null) {
-      final hazardTypes = (_latestAnalysis!['hazard_types'] as List<dynamic>? ?? const [])
-          .map((entry) => entry.toString())
-          .toList(growable: false);
+      final hazardTypes =
+          (_latestAnalysis!['hazard_types'] as List<dynamic>? ?? const [])
+              .map((entry) => entry.toString())
+              .toList(growable: false);
       if (hazardTypes.isEmpty) {
         return 'Most recent saved route had no hazard categories recorded.';
       }
       return 'Latest saved route hazards: ${hazardTypes.join(', ')}.';
     }
-    if (_activeTrip == null) return 'No active route is currently being tracked.';
+    if (_activeTrip == null)
+      return 'No active route is currently being tracked.';
     if (_routeHazards.isEmpty) {
       return 'No active community hazards are currently reported along this route.';
     }
@@ -193,10 +244,20 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
   }
 
   String _recommendationText() {
+    final liveSnapshot = NavigationSessionService.instance.currentSnapshot;
+    if (_activeTrip == null && liveSnapshot != null) {
+      if (_score >= 75)
+        return 'Guest navigation is active. Keep guardian tracking open while you travel.';
+      if (_score >= 50) {
+        return 'Stay on the selected route and keep guardian tracking open for safer travel.';
+      }
+      return 'Consider switching routes before moving, or share your trip with a guardian after sign-in.';
+    }
     if (_activeTrip == null && _latestAnalysis != null) {
       return 'Plan another trip to refresh live analysis, or review your saved route context.';
     }
-    if (_activeTrip == null) return 'Plan a route first, then review live risk.';
+    if (_activeTrip == null)
+      return 'Plan a route first, then review live risk.';
     if (_score >= 75) return 'Continue with guardian tracking enabled.';
     if (_score >= 50) {
       return 'Use guardian tracking and stay on the recommended route.';
@@ -206,7 +267,8 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
 
   Future<void> _shareRoute() async {
     final trip = _activeTrip;
-    final destination = trip?['destination_name']?.toString() ??
+    final destination =
+        trip?['destination_name']?.toString() ??
         _latestAnalysis?['destination_name']?.toString() ??
         'destination';
     await Share.share(
@@ -219,7 +281,8 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
     Map<String, dynamic> trip,
     List<Map<String, dynamic>> nearRoute,
   ) async {
-    final destinationName = trip['destination_name']?.toString() ?? 'Active Route';
+    final destinationName =
+        trip['destination_name']?.toString() ?? 'Active Route';
     final baseScore = await BbmpService.instance.routeSafetyScoreCached(
       destinationName,
       destinationName,
@@ -231,17 +294,38 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
     return (baseScore - penalty).clamp(0, 100).toDouble();
   }
 
+  Future<double> _fallbackLiveSessionScore(
+    NavigationSessionSnapshot snapshot,
+    List<Map<String, dynamic>> nearRoute,
+  ) async {
+    final destinationName = snapshot.destinationName;
+    final baseScore =
+        snapshot.baseScore ??
+        await BbmpService.instance.routeSafetyScoreCached(
+          destinationName,
+          destinationName,
+        );
+    final penalty = nearRoute.fold<double>(
+      snapshot.hazardPenalty ?? 0,
+      (sum, hazard) => sum + _hazardPenalty(hazard['hazard_type']),
+    );
+    return (baseScore - penalty).clamp(0, 100).toDouble();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final liveSnapshot = NavigationSessionService.instance.currentSnapshot;
     final potholes = _hazardCount('pothole');
     final lighting = _hazardCount('lighting');
     final theft = _hazardCount('theft');
     final scoreColor = _score >= 70
         ? const Color(0xFF10B981)
         : _score >= 50
-            ? const Color(0xFFF59E0B)
-            : const Color(0xFFEF4444);
-    final area = _activeTrip?['destination_name']?.toString() ??
+        ? const Color(0xFFF59E0B)
+        : const Color(0xFFEF4444);
+    final area =
+        _activeTrip?['destination_name']?.toString() ??
+        liveSnapshot?.destinationName ??
         _latestAnalysis?['destination_name']?.toString() ??
         'No Route';
     final wardContext = _latestAnalysis?['ward_name']?.toString();
@@ -309,12 +393,12 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
                                   width: 140,
                                   height: 140,
                                   child: CircularProgressIndicator(
-                                    value:
-                                        _progressAnim.value * (_score / 100),
+                                    value: _progressAnim.value * (_score / 100),
                                     strokeWidth: 10,
                                     backgroundColor: const Color(0xFFE5E7EB),
-                                    valueColor:
-                                        AlwaysStoppedAnimation<Color>(scoreColor),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      scoreColor,
+                                    ),
                                     strokeCap: StrokeCap.round,
                                   ),
                                 ),
@@ -435,8 +519,9 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
                               value: _progressAnim.value * (_score / 100),
                               minHeight: 10,
                               backgroundColor: const Color(0xFFE5E7EB),
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(scoreColor),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                scoreColor,
+                              ),
                             ),
                           ),
                         ),
@@ -591,8 +676,9 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
                               child: SizedBox(
                                 height: 46,
                                 child: OutlinedButton(
-                                  onPressed:
-                                      _activeTrip == null ? null : _shareRoute,
+                                  onPressed: _activeTrip == null
+                                      ? null
+                                      : _shareRoute,
                                   style: OutlinedButton.styleFrom(
                                     side: const BorderSide(
                                       color: Color(0xFFD1D5DB),
@@ -674,33 +760,30 @@ class _TabSafetyScoreScreenState extends State<TabSafetyScoreScreen>
   }
 }
 
-Widget _vDivider() => Container(
-      height: 30,
-      width: 1,
-      color: const Color(0xFFE5E7EB),
-    );
+Widget _vDivider() =>
+    Container(height: 30, width: 1, color: const Color(0xFFE5E7EB));
 
 Widget _StatsRow(String label, String value, Color valueColor) => Row(
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            color: Color(0xFF374151),
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const Spacer(),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: valueColor,
-          ),
-        ),
-      ],
-    );
+  children: [
+    Text(
+      label,
+      style: const TextStyle(
+        fontSize: 13,
+        color: Color(0xFF374151),
+        fontWeight: FontWeight.w500,
+      ),
+    ),
+    const Spacer(),
+    Text(
+      value,
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: valueColor,
+      ),
+    ),
+  ],
+);
 
 class _MetaItem extends StatelessWidget {
   final String label;
@@ -709,26 +792,26 @@ class _MetaItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 10,
-              color: Color(0xFF6B7280),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF111827),
-            ),
-          ),
-        ],
-      );
+    children: [
+      Text(
+        label,
+        style: const TextStyle(
+          fontSize: 10,
+          color: Color(0xFF6B7280),
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      const SizedBox(height: 3),
+      Text(
+        value,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF111827),
+        ),
+      ),
+    ],
+  );
 }
 
 class _MetricCard extends StatelessWidget {
@@ -752,60 +835,57 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 6,
-            ),
-          ],
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: const Color(0xFFE5E7EB)),
+      boxShadow: [
+        BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6),
+      ],
+    ),
+    child: Column(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: iconBg,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: iconColor, size: 20),
         ),
-        child: Column(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: iconBg,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: iconColor, size: 20),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 10,
-                color: Color(0xFF6B7280),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF111827),
-              ),
-            ),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 6,
-                backgroundColor: const Color(0xFFE5E7EB),
-                valueColor: AlwaysStoppedAnimation<Color>(barColor),
-              ),
-            ),
-          ],
+        const SizedBox(height: 10),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            color: Color(0xFF6B7280),
+            fontWeight: FontWeight.w600,
+          ),
         ),
-      );
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF111827),
+          ),
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: progress,
+            minHeight: 6,
+            backgroundColor: const Color(0xFFE5E7EB),
+            valueColor: AlwaysStoppedAnimation<Color>(barColor),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _AlertCard extends StatelessWidget {
@@ -829,51 +909,51 @@ class _AlertCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: borderColor, width: 2),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: bgColor,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: borderColor, width: 2),
+    ),
+    child: Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: iconBg,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: iconColor, size: 22),
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: iconBg,
-                borderRadius: BorderRadius.circular(10),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF111827),
+                ),
               ),
-              child: Icon(icon, color: iconColor, size: 22),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF111827),
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    body,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF374151),
-                      height: 1.4,
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 3),
+              Text(
+                body,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF374151),
+                  height: 1.4,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      );
+      ],
+    ),
+  );
 }
 
 class _RoutePainter extends CustomPainter {
@@ -885,21 +965,33 @@ class _RoutePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (points.length < 2) return;
 
-    final minLat = points.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
-    final maxLat = points.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
-    final minLng =
-        points.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
-    final maxLng =
-        points.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
+    final minLat = points
+        .map((p) => p.latitude)
+        .reduce((a, b) => a < b ? a : b);
+    final maxLat = points
+        .map((p) => p.latitude)
+        .reduce((a, b) => a > b ? a : b);
+    final minLng = points
+        .map((p) => p.longitude)
+        .reduce((a, b) => a < b ? a : b);
+    final maxLng = points
+        .map((p) => p.longitude)
+        .reduce((a, b) => a > b ? a : b);
 
-    final latSpan = (maxLat - minLat).abs() < 0.00001 ? 0.00001 : maxLat - minLat;
-    final lngSpan = (maxLng - minLng).abs() < 0.00001 ? 0.00001 : maxLng - minLng;
+    final latSpan = (maxLat - minLat).abs() < 0.00001
+        ? 0.00001
+        : maxLat - minLat;
+    final lngSpan = (maxLng - minLng).abs() < 0.00001
+        ? 0.00001
+        : maxLng - minLng;
     const padding = 18.0;
 
     Offset project(LatLng point) {
-      final x = padding +
+      final x =
+          padding +
           ((point.longitude - minLng) / lngSpan) * (size.width - padding * 2);
-      final y = padding +
+      final y =
+          padding +
           ((maxLat - point.latitude) / latSpan) * (size.height - padding * 2);
       return Offset(x, y);
     }

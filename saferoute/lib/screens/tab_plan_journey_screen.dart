@@ -9,6 +9,7 @@ import '../services/mapbox_service.dart';
 import '../services/navigation_session_service.dart';
 import '../services/safety_data_service.dart';
 import '../services/supabase_service.dart';
+import '../widgets/fullscreen_route_map.dart';
 import '../widgets/saferoute_appbar.dart';
 
 class RouteOptionData {
@@ -106,6 +107,27 @@ List<NavigationStep> previewNavigationSteps(
   return route.steps.take(limit).toList(growable: false);
 }
 
+String formatRoutePlannerError(Object error) {
+  final message = error.toString();
+  if (message.contains('Location services are disabled')) {
+    return 'Turn on device location to calculate the best routes.';
+  }
+  if (message.contains('Location permission was denied')) {
+    return 'Allow location access so SafeRoute can find the best route from where you are.';
+  }
+  if (message.contains('permanently denied')) {
+    return 'Enable location access in app settings so SafeRoute can calculate your route.';
+  }
+  if (message.contains('No location found for')) {
+    return 'We could not find that destination. Try a more specific Bengaluru landmark or address.';
+  }
+  if (message.contains('Mapbox geocoding failed') ||
+      message.contains('Mapbox routing failed')) {
+    return 'Route lookup is temporarily unavailable. Check your internet connection and try again.';
+  }
+  return 'Could not load routes: $error';
+}
+
 class TabPlanJourneyScreen extends StatefulWidget {
   final VoidCallback? onTripStarted;
 
@@ -170,7 +192,7 @@ class _TabPlanJourneyScreenState extends State<TabPlanJourneyScreen> {
       if (!mounted) return;
       setState(() {
         _locating = false;
-        _error = error.toString();
+        _error = formatRoutePlannerError(error);
       });
     }
   }
@@ -231,7 +253,7 @@ class _TabPlanJourneyScreenState extends State<TabPlanJourneyScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _error = 'Could not load routes: $error';
+        _error = formatRoutePlannerError(error);
         _loading = false;
       });
     }
@@ -291,7 +313,28 @@ class _TabPlanJourneyScreenState extends State<TabPlanJourneyScreen> {
       NavigationSessionService.instance.activateRoute(
         route.route,
         initialLocation: currentPoint,
+        destinationName: route.destinationName,
+        routeLabel: route.label,
+        safetyScore: route.score,
+        baseScore: route.baseScore,
+        hazardPenalty: route.hazardPenalty,
+        nearbyHazards: route.nearbyHazards,
       );
+      if (!SupabaseService.instance.isSignedIn) {
+        _startLiveNavigationTracking();
+        if (!mounted) return;
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Guest trip started locally. Sign in to sync guardian contacts, route history, and SOS backup.',
+            ),
+            backgroundColor: Color(0xFF1D4ED8),
+          ),
+        );
+        widget.onTripStarted?.call();
+        return;
+      }
       final trip = await SupabaseService.instance.startTrip(
         startLat: payload.start.latitude,
         startLng: payload.start.longitude,
@@ -397,6 +440,12 @@ class _TabPlanJourneyScreenState extends State<TabPlanJourneyScreen> {
       liveSession.applyReroute(
         reroutedSelection.route,
         currentLocation: currentLocation,
+        destinationName: destinationName,
+        routeLabel: reroutedSelection.label,
+        safetyScore: reroutedSelection.score,
+        baseScore: reroutedSelection.baseScore,
+        hazardPenalty: reroutedSelection.hazardPenalty,
+        nearbyHazards: reroutedSelection.nearbyHazards,
       );
       if (!mounted) return;
       setState(() {
@@ -425,8 +474,22 @@ class _TabPlanJourneyScreenState extends State<TabPlanJourneyScreen> {
   }
 
   Future<void> _endLiveTrip() async {
+    if (!SupabaseService.instance.isSignedIn) {
+      await _positionSub?.cancel();
+      NavigationSessionService.instance.clear();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Guest trip ended.'),
+          backgroundColor: Color(0xFF1E293B),
+        ),
+      );
+      setState(() {});
+      return;
+    }
     final trip = await SupabaseService.instance.getActiveTrip();
     if (trip == null) {
+      await _positionSub?.cancel();
       NavigationSessionService.instance.clear();
       return;
     }
@@ -501,6 +564,50 @@ class _TabPlanJourneyScreenState extends State<TabPlanJourneyScreen> {
     );
   }
 
+  Future<void> _openExpandedRouteMap() {
+    final routes = _routes;
+    if (routes == null || routes.isEmpty) {
+      return Future.value();
+    }
+    final fallbackCenter =
+        _startPoint ?? _destination?.point ?? routes.first.route.points.first;
+    return Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FullscreenRouteMapScreen(
+          title: 'Route Overview',
+          subtitle: 'Compare route lines and inspect the map closely',
+          initialCenter: fallbackCenter,
+          initialCameraFit: _cameraFitFor(routes),
+          routeLines: routes
+              .map(
+                (route) => FullscreenMapRouteLine(
+                  points: route.route.points,
+                  color: _routeColorFor(route).withValues(
+                    alpha: route.route.id == _selectedRouteId ? 0.96 : 0.4,
+                  ),
+                  strokeWidth: route.route.id == _selectedRouteId ? 7 : 5,
+                ),
+              )
+              .toList(growable: false),
+          markers: [
+            if (_startPoint != null)
+              FullscreenMapMarkerData(
+                point: _startPoint!,
+                color: const Color(0xFF2563EB),
+                icon: Icons.trip_origin_rounded,
+              ),
+            if (_destination?.point != null)
+              FullscreenMapMarkerData(
+                point: _destination!.point,
+                color: const Color(0xFFEF4444),
+                icon: Icons.location_on_rounded,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedRoute = _selectedRoute;
@@ -525,6 +632,45 @@ class _TabPlanJourneyScreenState extends State<TabPlanJourneyScreen> {
                         mapController: _navigationMapCtrl,
                         snapshot: snapshot,
                         onEndTrip: _endLiveTrip,
+                        onExpandMap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => FullscreenRouteMapScreen(
+                              title: snapshot.routeLabel ?? 'Live Navigation',
+                              subtitle: snapshot.destinationName,
+                              initialCenter: snapshot.currentLocation,
+                              initialCameraFit: CameraFit.bounds(
+                                bounds: LatLngBounds.fromPoints(
+                                  snapshot.route.points,
+                                ),
+                                padding: const EdgeInsets.all(36),
+                                maxZoom: 16,
+                              ),
+                              routeLines: [
+                                FullscreenMapRouteLine(
+                                  points: snapshot.route.points,
+                                  color: snapshot.isEmergencyActive
+                                      ? const Color(0xFFEF4444)
+                                      : snapshot.state.isOffRoute
+                                      ? const Color(0xFFF97316)
+                                      : const Color(0xFF38BDF8),
+                                  strokeWidth: 7,
+                                ),
+                              ],
+                              markers: [
+                                FullscreenMapMarkerData(
+                                  point: snapshot.currentLocation,
+                                  color: const Color(0xFF10B981),
+                                  icon: Icons.navigation_rounded,
+                                ),
+                                FullscreenMapMarkerData(
+                                  point: snapshot.route.points.last,
+                                  color: const Color(0xFFEF4444),
+                                  icon: Icons.flag_rounded,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     );
                   },
@@ -658,6 +804,7 @@ class _TabPlanJourneyScreenState extends State<TabPlanJourneyScreen> {
                     routeColorFor: _routeColorFor,
                     onSelectRoute: _selectRoute,
                     routeHitNotifier: _routeHitNotifier,
+                    onExpand: _openExpandedRouteMap,
                   ),
                   const SizedBox(height: 16),
                   _SelectedRouteSummary(
@@ -783,6 +930,7 @@ class _RouteChooserMap extends StatelessWidget {
   final LatLng? destinationPoint;
   final CameraFit? cameraFit;
   final ValueChanged<String> onSelectRoute;
+  final VoidCallback onExpand;
   final Color Function(RouteOptionData route) routeColorFor;
   final LayerHitNotifier<String> routeHitNotifier;
 
@@ -795,6 +943,7 @@ class _RouteChooserMap extends StatelessWidget {
     required this.destinationPoint,
     required this.cameraFit,
     required this.onSelectRoute,
+    required this.onExpand,
     required this.routeColorFor,
     required this.routeHitNotifier,
   });
@@ -809,7 +958,7 @@ class _RouteChooserMap extends StatelessWidget {
             : const LatLng(12.9716, 77.5946));
 
     return Container(
-      height: 260,
+      height: 320,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -933,6 +1082,31 @@ class _RouteChooserMap extends StatelessWidget {
                     .toList(growable: false),
               ),
             ),
+            Positioned(
+              right: 12,
+              bottom: 12,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.95),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.12),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  tooltip: 'Expand map',
+                  onPressed: onExpand,
+                  icon: const Icon(
+                    Icons.open_in_full_rounded,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -944,11 +1118,13 @@ class _LiveNavigationPanel extends StatelessWidget {
   final MapController mapController;
   final NavigationSessionSnapshot snapshot;
   final Future<void> Function() onEndTrip;
+  final VoidCallback onExpandMap;
 
   const _LiveNavigationPanel({
     required this.mapController,
     required this.snapshot,
     required this.onEndTrip,
+    required this.onExpandMap,
   });
 
   @override
@@ -1017,6 +1193,16 @@ class _LiveNavigationPanel extends StatelessWidget {
                 ),
               ),
               const Spacer(),
+              _JourneyTimerChip(startedAt: snapshot.startedAt),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'Expand map',
+                onPressed: onExpandMap,
+                icon: const Icon(
+                  Icons.open_in_full_rounded,
+                  color: Colors.white,
+                ),
+              ),
               TextButton(
                 onPressed: onEndTrip,
                 child: const Text(
@@ -1030,6 +1216,11 @@ class _LiveNavigationPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
+          Text(
+            snapshot.destinationName,
+            style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+          ),
+          const SizedBox(height: 8),
           Text(
             snapshot.isRerouting
                 ? 'Finding a safer route from your current location...'
@@ -1052,7 +1243,7 @@ class _LiveNavigationPanel extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(18),
             child: SizedBox(
-              height: 240,
+              height: 300,
               child: FlutterMap(
                 mapController: mapController,
                 options: MapOptions(
@@ -1312,7 +1503,8 @@ class _SelectedRouteSummary extends StatelessWidget {
                       color: Color(0xFF111827),
                     ),
                   ),
-                  if (liveSnapshot?.isRerouting != true && nextInstruction != null)
+                  if (liveSnapshot?.isRerouting != true &&
+                      nextInstruction != null)
                     Text(
                       'Next: $nextInstruction',
                       style: const TextStyle(
@@ -1429,7 +1621,7 @@ class _SelectedRouteSummary extends StatelessWidget {
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
-                        onPressed: onStartNavigation,
+              onPressed: onStartNavigation,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1E293B),
                 shape: RoundedRectangleBorder(
@@ -1449,6 +1641,39 @@ class _SelectedRouteSummary extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _JourneyTimerChip extends StatelessWidget {
+  final DateTime startedAt;
+
+  const _JourneyTimerChip({required this.startedAt});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<int>(
+      stream: Stream<int>.periodic(const Duration(seconds: 1), (tick) => tick),
+      initialData: 0,
+      builder: (context, _) {
+        final elapsed = DateTime.now().difference(startedAt);
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          ),
+          child: Text(
+            formatElapsedJourneyTime(elapsed),
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+        );
+      },
     );
   }
 }

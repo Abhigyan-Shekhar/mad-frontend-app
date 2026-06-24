@@ -31,6 +31,7 @@ class SupabaseService {
   SupabaseClient get _client => Supabase.instance.client;
   User? get currentUser => _client.auth.currentUser;
   Session? get currentSession => _client.auth.currentSession;
+  bool get isSignedIn => currentUser != null;
 
   String get _userId {
     final id = currentUser?.id;
@@ -106,6 +107,7 @@ class SupabaseService {
   }
 
   Future<List<Map<String, dynamic>>> getMyTrips() async {
+    if (!isSignedIn) return const [];
     final rows = await _client
         .from('trips')
         .select()
@@ -116,6 +118,7 @@ class SupabaseService {
   }
 
   Future<Map<String, dynamic>?> getActiveTrip() async {
+    if (!isSignedIn) return null;
     final rows = await _client
         .from('trips')
         .select()
@@ -253,6 +256,7 @@ class SupabaseService {
 
   // ─── EMERGENCY CONTACTS ──────────────────────────────────────
   Future<List<Map<String, dynamic>>> getEmergencyContacts() async {
+    if (!isSignedIn) return const [];
     final rows = await _client
         .from('emergency_contacts')
         .select()
@@ -318,6 +322,7 @@ class SupabaseService {
   }
 
   Future<Map<String, dynamic>?> getLatestRouteAnalysis({String? tripId}) async {
+    if (!isSignedIn) return null;
     try {
       final query = tripId == null
           ? _client

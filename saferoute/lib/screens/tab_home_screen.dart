@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/bbmp_service.dart';
 import '../services/location_service.dart';
 import '../services/supabase_service.dart';
+import 'auth_screen.dart';
 
 class TabHomeScreen extends StatefulWidget {
   final VoidCallback? onPlanJourneyTap;
@@ -23,6 +25,27 @@ class _TabHomeScreenState extends State<TabHomeScreen> {
   LatLng? _currentPoint;
   bool _loading = true;
 
+  User? get _currentUser => SupabaseService.instance.currentUser;
+  bool get _isSignedIn => _currentUser != null;
+
+  String get _heroTitle {
+    if (_activeTrip != null) {
+      return 'Navigation is live.\nStay on your safer route.';
+    }
+    return _isSignedIn
+        ? 'Welcome back.\nPlan your next safer trip.'
+        : 'Your safest route,\nevery time.';
+  }
+
+  String get _heroSubtitle {
+    if (_activeTrip != null) {
+      return 'Guardian tracking, route safety, and live monitoring are active for your current trip.';
+    }
+    return _isSignedIn
+        ? 'You are signed in and ready to plan, track, and share safe journeys across Bengaluru.'
+        : 'Navigate safely with intelligent routing that considers lighting, road quality, incidents, and emergency access.';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -35,8 +58,11 @@ class _TabHomeScreenState extends State<TabHomeScreen> {
       final hazards = await SupabaseService.instance.getActiveHazards();
       final trips = await SupabaseService.instance.getMyTrips();
       final contacts = await SupabaseService.instance.getEmergencyContacts();
-      final latestAnalysis = await SupabaseService.instance.getLatestRouteAnalysis();
-      final topRiskWards = await BbmpService.instance.topRiskWardsCached(limit: 3);
+      final latestAnalysis = await SupabaseService.instance
+          .getLatestRouteAnalysis();
+      final topRiskWards = await BbmpService.instance.topRiskWardsCached(
+        limit: 3,
+      );
       LatLng? currentPoint;
       try {
         final position = await LocationService.currentPosition();
@@ -77,264 +103,661 @@ class _TabHomeScreenState extends State<TabHomeScreen> {
             titleSpacing: 16,
             toolbarHeight: 56,
             shape: const Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
-            title: Row(children: [
-              Container(
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Color(0xFF334155), Color(0xFF0F172A)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 6)],
+            title: Row(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF334155), Color(0xFF0F172A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(7),
+                  child: const Icon(
+                    Icons.location_on_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ),
-                padding: const EdgeInsets.all(7),
-                child: const Icon(Icons.location_on_rounded, color: Colors.white, size: 18),
-              ),
-              const SizedBox(width: 10),
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
-                Text('SAFEROUTE', style: TextStyle(fontSize: 8, color: Color(0xFF6B7280), letterSpacing: 3, fontWeight: FontWeight.w700)),
-                Text('Your Safety Partner', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF1F2937))),
-              ]),
-            ]),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'SAFEROUTE',
+                      style: TextStyle(
+                        fontSize: 8,
+                        color: Color(0xFF6B7280),
+                        letterSpacing: 3,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      'Your Safety Partner',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1F2937),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
             actions: [
               if (_loading)
-                const Padding(padding: EdgeInsets.only(right: 16), child: Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF1E293B))))),
+                const Padding(
+                  padding: EdgeInsets.only(right: 16),
+                  child: Center(
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
 
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
-            sliver: SliverList(delegate: SliverChildListDelegate([
-
-              // ── Hero section ─────────────────────────────────
-              // "Smart Navigation" tag
-              Row(children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
-                  child: Row(children: const [
-                    Icon(Icons.location_on_rounded, size: 14, color: Color(0xFF334155)),
-                    SizedBox(width: 6),
-                    Text('Smart Navigation', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF334155), letterSpacing: 0.5)),
-                  ]),
-                ),
-              ]),
-              const SizedBox(height: 16),
-              const Text('Your safest route,\nevery time.', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Color(0xFF111827), height: 1.15)),
-              const SizedBox(height: 12),
-              const Text('Navigate safely with intelligent routing that considers lighting, road quality, incidents, and emergency access.',
-                  style: TextStyle(fontSize: 14, color: Color(0xFF6B7280), height: 1.6)),
-              const SizedBox(height: 24),
-
-              // CTA buttons
-              _SlateButton(label: 'Get Started', icon: Icons.bolt_rounded, onTap: widget.onPlanJourneyTap ?? () {}),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: widget.onPlanJourneyTap,
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFD1D5DB), width: 2),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Center(child: Text('Continue as Guest', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF374151)))),
-              ),
-              const SizedBox(height: 28),
-
-              // ── Stats cards ───────────────────────────────────
-              Row(children: [
-                Expanded(child: _StatCard(icon: Icons.route_rounded, iconColor: const Color(0xFF2563EB), bgColor: const Color(0xFFEFF6FF), label: 'Trips', value: _trips.length.toString())),
-                const SizedBox(width: 10),
-                Expanded(child: _StatCard(icon: Icons.warning_rounded, iconColor: const Color(0xFF059669), bgColor: const Color(0xFFECFDF5), label: 'Alerts', value: _hazards.length.toString())),
-                const SizedBox(width: 10),
-                Expanded(child: _StatCard(icon: Icons.shield_rounded, iconColor: const Color(0xFFD97706), bgColor: const Color(0xFFFFFBEB), label: 'Guardians', value: _contacts.length.toString())),
-              ]),
-              const SizedBox(height: 24),
-
-              // ── Live Monitoring card ──────────────────────────
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 16, offset: const Offset(0, 4))],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                // ── Hero section ─────────────────────────────────
+                // "Smart Navigation" tag
+                Row(
                   children: [
-                    // Live indicator
-                    Row(children: [
-                      Container(width: 10, height: 10,
-                        decoration: BoxDecoration(color: const Color(0xFF10B981), shape: BoxShape.circle,
-                          boxShadow: [BoxShadow(color: const Color(0xFF10B981).withOpacity(0.5), blurRadius: 6)]),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
                       ),
-                      const SizedBox(width: 8),
-                      const Text('Live Monitoring', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF059669), letterSpacing: 0.5)),
-                    ]),
-                    const SizedBox(height: 12),
-                    Text(_activeTrip == null ? 'Sentinel Protocol Ready' : 'Sentinel Protocol Active', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF111827))),
-                    const SizedBox(height: 6),
-                    Text(_hazards.isEmpty
-                        ? 'No active community hazards are currently loaded from Supabase.'
-                        : '${_hazards.length} active community hazard(s) are loaded from Supabase.',
-                        style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280), height: 1.5)),
-                    const SizedBox(height: 20),
-
-                    // Mini Bengaluru map
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: SizedBox(
-                        height: 180,
-                        child: FlutterMap(
-                          options: MapOptions(
-                            initialCenter: _currentPoint ?? const LatLng(12.9716, 77.5946),
-                            initialZoom: 12,
-                            interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: const [
+                          Icon(
+                            Icons.location_on_rounded,
+                            size: 14,
+                            color: Color(0xFF334155),
                           ),
-                          children: [
-                            TileLayer(
-                              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                              userAgentPackageName: 'com.saferoute.app',
+                          SizedBox(width: 6),
+                          Text(
+                            'Smart Navigation',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF334155),
+                              letterSpacing: 0.5,
                             ),
-                            CircleLayer(circles: [
-                              CircleMarker(point: _currentPoint ?? const LatLng(12.9716, 77.5946), radius: 5, color: const Color(0xFF10B981), borderColor: Colors.white, borderStrokeWidth: 2, useRadiusInMeter: false),
-                            ]),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-
-                    // Safe route / Guardian row
-                    Row(children: [
-                      Expanded(child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFD1FAE5))),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          const Text('Safe Route', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF059669))),
-                          const SizedBox(height: 2),
-                          Text(_activeTrip?['destination_name']?.toString() ?? 'Plan route', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF111827))),
-                        ]),
-                      )),
-                      const SizedBox(width: 10),
-                      Expanded(child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFBFDBFE))),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          const Text('Guardian', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF2563EB))),
-                          const SizedBox(height: 2),
-                          Text(_contacts.isEmpty ? 'Add contact' : '${_contacts.length} ready', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF111827))),
-                        ]),
-                      )),
-                    ]),
-                    const SizedBox(height: 16),
-                    _SlateButton(label: 'Plan Your Journey', icon: Icons.chevron_right, onTap: widget.onPlanJourneyTap ?? () {}),
                   ],
                 ),
-              ),
-              const SizedBox(height: 16),
-
-              // ── SOS Deadzone Alert ────────────────────────────
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFFBEB),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFFCD34D), width: 2),
+                const SizedBox(height: 16),
+                Text(
+                  _heroTitle,
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF111827),
+                    height: 1.15,
+                  ),
                 ),
-                child: Row(children: [
+                const SizedBox(height: 12),
+                Text(
+                  _heroSubtitle,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF6B7280),
+                    height: 1.6,
+                  ),
+                ),
+                if (_isSignedIn) ...[
+                  const SizedBox(height: 16),
                   Container(
-                    width: 40, height: 40,
-                    decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(10)),
-                    child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFB45309), size: 22),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('SOS Deadzone Alert', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF78350F))),
-                    const SizedBox(height: 3),
-                    Text(_deadzoneCount == 0
-                        ? 'No active deadzone hazards are currently reported.'
-                        : '$_deadzoneCount active deadzone hazard(s) are currently reported.',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF374151), height: 1.4)),
-                  ])),
-                ]),
-              ),
-
-              // BBMP data footer
-              if (_wardScores.isNotEmpty) ...[
-                const SizedBox(height: 24),
-                Text('Live BBMP Data · ${_wardScores.length} wards tracked',
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF), fontWeight: FontWeight.w500)),
-              ],
-              if (_latestAnalysis != null) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Latest Saved Route Analysis',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF111827)),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${_latestAnalysis!['destination_name'] ?? 'Route'} · Score ${((_latestAnalysis!['score'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)}/100',
-                        style: const TextStyle(fontSize: 13, color: Color(0xFF374151)),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '${_latestAnalysis!['ward_name'] ?? 'Ward context pending'}${_latestAnalysis!['street_summary'] == null ? '' : ' · ${_latestAnalysis!['street_summary']}'}',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-              if (_topRiskWards.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'BBMP Risk Watch',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF111827)),
-                      ),
-                      const SizedBox(height: 10),
-                      ..._topRiskWards.map(
-                        (ward) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    child: Row(
+                      children: [
+                        const CircleAvatar(
+                          radius: 18,
+                          backgroundColor: Color(0xFFE0F2FE),
+                          child: Icon(
+                            Icons.person_rounded,
+                            color: Color(0xFF0369A1),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: Text(
-                                  ward['ward_name']?.toString() ?? 'Unknown ward',
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151)),
+                              const Text(
+                                'Signed In',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF64748B),
                                 ),
                               ),
                               Text(
-                                '${((ward['safety_score'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)}/100',
-                                style: const TextStyle(fontSize: 12, color: Color(0xFFB45309), fontWeight: FontWeight.w700),
+                                _currentUser?.email ?? 'SafeRoute user',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF111827),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+
+                // CTA buttons
+                _SlateButton(
+                  label: _activeTrip != null
+                      ? 'Open Live Route'
+                      : _isSignedIn
+                      ? 'Plan Your Next Route'
+                      : 'Get Started',
+                  icon: _activeTrip != null
+                      ? Icons.navigation_rounded
+                      : Icons.bolt_rounded,
+                  onTap: widget.onPlanJourneyTap ?? () {},
+                ),
+                const SizedBox(height: 12),
+                if (_isSignedIn)
+                  OutlinedButton(
+                    onPressed: () async {
+                      await SupabaseService.instance.signOut();
+                      if (!context.mounted) return;
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AuthScreen()),
+                        (_) => false,
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(
+                        color: Color(0xFFD1D5DB),
+                        width: 2,
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Sign Out',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF374151),
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  OutlinedButton(
+                    onPressed: widget.onPlanJourneyTap,
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(
+                        color: Color(0xFFD1D5DB),
+                        width: 2,
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Continue as Guest',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF374151),
+                        ),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 28),
+
+                // ── Stats cards ───────────────────────────────────
+                Row(
+                  children: [
+                    Expanded(
+                      child: _StatCard(
+                        icon: Icons.route_rounded,
+                        iconColor: const Color(0xFF2563EB),
+                        bgColor: const Color(0xFFEFF6FF),
+                        label: 'Trips',
+                        value: _trips.length.toString(),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _StatCard(
+                        icon: Icons.warning_rounded,
+                        iconColor: const Color(0xFF059669),
+                        bgColor: const Color(0xFFECFDF5),
+                        label: 'Alerts',
+                        value: _hazards.length.toString(),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _StatCard(
+                        icon: Icons.shield_rounded,
+                        iconColor: const Color(0xFFD97706),
+                        bgColor: const Color(0xFFFFFBEB),
+                        label: 'Guardians',
+                        value: _contacts.length.toString(),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // ── Live Monitoring card ──────────────────────────
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Live indicator
+                      Row(
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF10B981,
+                                  ).withOpacity(0.5),
+                                  blurRadius: 6,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Live Monitoring',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF059669),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _activeTrip == null
+                            ? 'Sentinel Protocol Ready'
+                            : 'Sentinel Protocol Active',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF111827),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        _hazards.isEmpty
+                            ? 'No active community hazards are currently loaded from Supabase.'
+                            : '${_hazards.length} active community hazard(s) are loaded from Supabase.',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF6B7280),
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Mini Bengaluru map
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(
+                          height: 180,
+                          child: FlutterMap(
+                            options: MapOptions(
+                              initialCenter:
+                                  _currentPoint ??
+                                  const LatLng(12.9716, 77.5946),
+                              initialZoom: 12,
+                              interactionOptions: const InteractionOptions(
+                                flags: InteractiveFlag.none,
+                              ),
+                            ),
+                            children: [
+                              TileLayer(
+                                urlTemplate:
+                                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                userAgentPackageName: 'com.saferoute.app',
+                              ),
+                              CircleLayer(
+                                circles: [
+                                  CircleMarker(
+                                    point:
+                                        _currentPoint ??
+                                        const LatLng(12.9716, 77.5946),
+                                    radius: 5,
+                                    color: const Color(0xFF10B981),
+                                    borderColor: Colors.white,
+                                    borderStrokeWidth: 2,
+                                    useRadiusInMeter: false,
+                                  ),
+                                ],
                               ),
                             ],
                           ),
                         ),
                       ),
+                      const SizedBox(height: 16),
+
+                      // Safe route / Guardian row
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFECFDF5),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: const Color(0xFFD1FAE5),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Safe Route',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF059669),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _activeTrip?['destination_name']
+                                            ?.toString() ??
+                                        'Plan route',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF111827),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: const Color(0xFFBFDBFE),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Guardian',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF2563EB),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _contacts.isEmpty
+                                        ? 'Add contact'
+                                        : '${_contacts.length} ready',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF111827),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      _SlateButton(
+                        label: 'Plan Your Journey',
+                        icon: Icons.chevron_right,
+                        onTap: widget.onPlanJourneyTap ?? () {},
+                      ),
                     ],
                   ),
                 ),
-              ],
+                const SizedBox(height: 16),
 
-            ])),
+                // ── SOS Deadzone Alert ────────────────────────────
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: const Color(0xFFFCD34D),
+                      width: 2,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.warning_amber_rounded,
+                          color: Color(0xFFB45309),
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'SOS Deadzone Alert',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF78350F),
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              _deadzoneCount == 0
+                                  ? 'No active deadzone hazards are currently reported.'
+                                  : '$_deadzoneCount active deadzone hazard(s) are currently reported.',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF374151),
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // BBMP data footer
+                if (_wardScores.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  Text(
+                    'Live BBMP Data · ${_wardScores.length} wards tracked',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF9CA3AF),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+                if (_latestAnalysis != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Latest Saved Route Analysis',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF111827),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${_latestAnalysis!['destination_name'] ?? 'Route'} · Score ${((_latestAnalysis!['score'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)}/100',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF374151),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '${_latestAnalysis!['ward_name'] ?? 'Ward context pending'}${_latestAnalysis!['street_summary'] == null ? '' : ' · ${_latestAnalysis!['street_summary']}'}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (_topRiskWards.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'BBMP Risk Watch',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF111827),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        ..._topRiskWards.map(
+                          (ward) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    ward['ward_name']?.toString() ??
+                                        'Unknown ward',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF374151),
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  '${((ward['safety_score'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)}/100',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFFB45309),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ]),
+            ),
           ),
         ],
       ),
@@ -350,7 +773,9 @@ class _TabHomeScreenState extends State<TabHomeScreen> {
   }
 
   int get _deadzoneCount {
-    return _hazards.where((hazard) => hazard['hazard_type'] == 'deadzone').length;
+    return _hazards
+        .where((hazard) => hazard['hazard_type'] == 'deadzone')
+        .length;
   }
 }
 
@@ -358,21 +783,56 @@ class _StatCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor, bgColor;
   final String label, value;
-  const _StatCard({required this.icon, required this.iconColor, required this.bgColor, required this.label, required this.value});
+  const _StatCard({
+    required this.icon,
+    required this.iconColor,
+    required this.bgColor,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)]),
-    child: Column(children: [
-      Container(width: 38, height: 38, decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(10)),
-          child: Icon(icon, color: iconColor, size: 20)),
-      const SizedBox(height: 10),
-      Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF6B7280), fontWeight: FontWeight.w600)),
-      const SizedBox(height: 2),
-      Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF111827))),
-    ]),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: const Color(0xFFE5E7EB)),
+      boxShadow: [
+        BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8),
+      ],
+    ),
+    child: Column(
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: iconColor, size: 20),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            color: Color(0xFF6B7280),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF111827),
+          ),
+        ),
+      ],
+    ),
   );
 }
 
@@ -380,7 +840,11 @@ class _SlateButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final VoidCallback onTap;
-  const _SlateButton({required this.label, required this.icon, required this.onTap});
+  const _SlateButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) => SizedBox(
@@ -389,7 +853,10 @@ class _SlateButton extends StatelessWidget {
     child: ElevatedButton.icon(
       onPressed: onTap,
       icon: Icon(icon, size: 20),
-      label: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+      label: Text(
+        label,
+        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+      ),
       style: ElevatedButton.styleFrom(
         backgroundColor: const Color(0xFF1E293B),
         foregroundColor: Colors.white,
