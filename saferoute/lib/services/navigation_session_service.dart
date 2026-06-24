@@ -8,6 +8,13 @@ class NavigationSessionSnapshot {
   final NavigationRoute route;
   final NavigationState state;
   final LatLng currentLocation;
+  final DateTime startedAt;
+  final String destinationName;
+  final String? routeLabel;
+  final double? safetyScore;
+  final double? baseScore;
+  final double? hazardPenalty;
+  final List<Map<String, dynamic>> nearbyHazards;
   final bool isEmergencyActive;
   final bool isRerouting;
   final int rerouteCount;
@@ -16,10 +23,28 @@ class NavigationSessionSnapshot {
     required this.route,
     required this.state,
     required this.currentLocation,
+    required this.startedAt,
+    required this.destinationName,
+    this.routeLabel,
+    this.safetyScore,
+    this.baseScore,
+    this.hazardPenalty,
+    this.nearbyHazards = const [],
     this.isEmergencyActive = false,
     this.isRerouting = false,
     this.rerouteCount = 0,
   });
+}
+
+String formatElapsedJourneyTime(Duration duration) {
+  final totalMinutes = duration.inMinutes;
+  final hours = totalMinutes ~/ 60;
+  final minutes = totalMinutes % 60;
+  final seconds = duration.inSeconds % 60;
+  if (hours > 0) {
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+  return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
 }
 
 class NavigationSessionService {
@@ -60,7 +85,16 @@ class NavigationSessionService {
     return snapshot.route.steps[nextIndex].instruction;
   }
 
-  void activateRoute(NavigationRoute route, {required LatLng initialLocation}) {
+  void activateRoute(
+    NavigationRoute route, {
+    required LatLng initialLocation,
+    required String destinationName,
+    String? routeLabel,
+    double? safetyScore,
+    double? baseScore,
+    double? hazardPenalty,
+    List<Map<String, dynamic>> nearbyHazards = const [],
+  }) {
     final state = NavigationEngine.evaluate(
       route: route,
       currentStepIndex: 0,
@@ -70,6 +104,13 @@ class NavigationSessionService {
       route: route,
       state: state,
       currentLocation: initialLocation,
+      startedAt: DateTime.now(),
+      destinationName: destinationName,
+      routeLabel: routeLabel,
+      safetyScore: safetyScore,
+      baseScore: baseScore,
+      hazardPenalty: hazardPenalty,
+      nearbyHazards: nearbyHazards,
     );
   }
 
@@ -85,6 +126,13 @@ class NavigationSessionService {
       route: snapshot.route,
       state: state,
       currentLocation: currentLocation,
+      startedAt: snapshot.startedAt,
+      destinationName: snapshot.destinationName,
+      routeLabel: snapshot.routeLabel,
+      safetyScore: snapshot.safetyScore,
+      baseScore: snapshot.baseScore,
+      hazardPenalty: snapshot.hazardPenalty,
+      nearbyHazards: snapshot.nearbyHazards,
       isEmergencyActive: snapshot.isEmergencyActive,
       isRerouting: snapshot.isRerouting,
       rerouteCount: snapshot.rerouteCount,
@@ -98,6 +146,13 @@ class NavigationSessionService {
       route: snapshot.route,
       state: snapshot.state,
       currentLocation: snapshot.currentLocation,
+      startedAt: snapshot.startedAt,
+      destinationName: snapshot.destinationName,
+      routeLabel: snapshot.routeLabel,
+      safetyScore: snapshot.safetyScore,
+      baseScore: snapshot.baseScore,
+      hazardPenalty: snapshot.hazardPenalty,
+      nearbyHazards: snapshot.nearbyHazards,
       isEmergencyActive: snapshot.isEmergencyActive,
       isRerouting: true,
       rerouteCount: snapshot.rerouteCount,
@@ -107,6 +162,12 @@ class NavigationSessionService {
   void applyReroute(
     NavigationRoute route, {
     required LatLng currentLocation,
+    String? destinationName,
+    String? routeLabel,
+    double? safetyScore,
+    double? baseScore,
+    double? hazardPenalty,
+    List<Map<String, dynamic>>? nearbyHazards,
   }) {
     final snapshot = notifier.value;
     final nextRerouteCount = (snapshot?.rerouteCount ?? 0) + 1;
@@ -119,6 +180,14 @@ class NavigationSessionService {
       route: route,
       state: state,
       currentLocation: currentLocation,
+      startedAt: snapshot?.startedAt ?? DateTime.now(),
+      destinationName:
+          destinationName ?? snapshot?.destinationName ?? 'Destination',
+      routeLabel: routeLabel ?? snapshot?.routeLabel,
+      safetyScore: safetyScore ?? snapshot?.safetyScore,
+      baseScore: baseScore ?? snapshot?.baseScore,
+      hazardPenalty: hazardPenalty ?? snapshot?.hazardPenalty,
+      nearbyHazards: nearbyHazards ?? snapshot?.nearbyHazards ?? const [],
       isEmergencyActive: snapshot?.isEmergencyActive ?? false,
       isRerouting: false,
       rerouteCount: nextRerouteCount,
@@ -132,6 +201,13 @@ class NavigationSessionService {
       route: snapshot.route,
       state: snapshot.state,
       currentLocation: snapshot.currentLocation,
+      startedAt: snapshot.startedAt,
+      destinationName: snapshot.destinationName,
+      routeLabel: snapshot.routeLabel,
+      safetyScore: snapshot.safetyScore,
+      baseScore: snapshot.baseScore,
+      hazardPenalty: snapshot.hazardPenalty,
+      nearbyHazards: snapshot.nearbyHazards,
       isEmergencyActive: snapshot.isEmergencyActive,
       isRerouting: false,
       rerouteCount: snapshot.rerouteCount,
@@ -145,6 +221,13 @@ class NavigationSessionService {
       route: snapshot.route,
       state: snapshot.state,
       currentLocation: snapshot.currentLocation,
+      startedAt: snapshot.startedAt,
+      destinationName: snapshot.destinationName,
+      routeLabel: snapshot.routeLabel,
+      safetyScore: snapshot.safetyScore,
+      baseScore: snapshot.baseScore,
+      hazardPenalty: snapshot.hazardPenalty,
+      nearbyHazards: snapshot.nearbyHazards,
       isEmergencyActive: true,
       isRerouting: snapshot.isRerouting,
       rerouteCount: snapshot.rerouteCount,
@@ -158,6 +241,13 @@ class NavigationSessionService {
       route: snapshot.route,
       state: snapshot.state,
       currentLocation: snapshot.currentLocation,
+      startedAt: snapshot.startedAt,
+      destinationName: snapshot.destinationName,
+      routeLabel: snapshot.routeLabel,
+      safetyScore: snapshot.safetyScore,
+      baseScore: snapshot.baseScore,
+      hazardPenalty: snapshot.hazardPenalty,
+      nearbyHazards: snapshot.nearbyHazards,
       isEmergencyActive: false,
       isRerouting: snapshot.isRerouting,
       rerouteCount: snapshot.rerouteCount,

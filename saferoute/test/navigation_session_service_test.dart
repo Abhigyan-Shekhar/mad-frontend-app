@@ -29,14 +29,32 @@ NavigationRoute _route() {
 }
 
 void main() {
+  test('formats elapsed journey time in mm:ss and hh:mm:ss', () {
+    expect(
+      formatElapsedJourneyTime(const Duration(minutes: 5, seconds: 7)),
+      '05:07',
+    );
+    expect(
+      formatElapsedJourneyTime(
+        const Duration(hours: 1, minutes: 2, seconds: 3),
+      ),
+      '01:02:03',
+    );
+  });
+
   test('exposes current and next instruction from active navigation state', () {
     final service = NavigationSessionService();
     final route = _route();
 
-    service.activateRoute(route, initialLocation: route.points.first);
+    service.activateRoute(
+      route,
+      initialLocation: route.points.first,
+      destinationName: 'MG Road',
+    );
 
     expect(service.currentInstruction, 'Head north on 6th Cross Road');
     expect(service.nextInstruction, 'Turn right toward Brigade Road');
+    expect(service.currentSnapshot?.startedAt, isNotNull);
   });
 
   test(
@@ -45,7 +63,11 @@ void main() {
       final service = NavigationSessionService();
       final route = _route();
 
-      service.activateRoute(route, initialLocation: route.points.first);
+      service.activateRoute(
+        route,
+        initialLocation: route.points.first,
+        destinationName: 'MG Road',
+      );
       service.updateWithLocation(route.points.last);
 
       expect(service.currentState?.hasArrived, isTrue);
@@ -57,7 +79,11 @@ void main() {
     final service = NavigationSessionService();
     final route = _route();
 
-    service.activateRoute(route, initialLocation: route.points.first);
+    service.activateRoute(
+      route,
+      initialLocation: route.points.first,
+      destinationName: 'MG Road',
+    );
     service.clear();
 
     expect(service.currentSnapshot, isNull);
@@ -92,7 +118,18 @@ void main() {
       ],
     );
 
-    service.activateRoute(route, initialLocation: route.points.first);
+    service.activateRoute(
+      route,
+      initialLocation: route.points.first,
+      destinationName: 'MG Road',
+      routeLabel: 'Well-lit Streets',
+      safetyScore: 82,
+      baseScore: 88,
+      hazardPenalty: 6,
+      nearbyHazards: const [
+        {'hazard_type': 'lighting', 'lat': 12.9719, 'lng': 77.5949},
+      ],
+    );
     service.markRerouting();
 
     expect(service.currentSnapshot?.isRerouting, isTrue);
@@ -101,15 +138,17 @@ void main() {
     service.applyReroute(
       reroutedRoute,
       currentLocation: currentLocation,
+      routeLabel: 'Safer Reroute',
+      safetyScore: 76,
     );
 
     expect(service.activeRoute?.id, 'route-2');
     expect(service.currentSnapshot?.isRerouting, isFalse);
     expect(service.currentSnapshot?.rerouteCount, 1);
-    expect(
-      service.currentInstruction,
-      'Turn left onto Residency Road',
-    );
+    expect(service.currentSnapshot?.destinationName, 'MG Road');
+    expect(service.currentSnapshot?.routeLabel, 'Safer Reroute');
+    expect(service.currentSnapshot?.safetyScore, 76);
+    expect(service.currentInstruction, 'Turn left onto Residency Road');
     expect(service.currentState?.isOffRoute, isFalse);
   });
 }

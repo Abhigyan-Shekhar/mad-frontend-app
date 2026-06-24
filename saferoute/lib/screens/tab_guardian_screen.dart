@@ -10,6 +10,7 @@ import '../services/location_service.dart';
 import '../services/mapbox_service.dart';
 import '../services/navigation_session_service.dart';
 import '../services/supabase_service.dart';
+import '../widgets/fullscreen_route_map.dart';
 import '../widgets/saferoute_appbar.dart';
 
 class TabGuardianScreen extends StatefulWidget {
@@ -58,6 +59,7 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
       final contacts = await _svc.getEmergencyContacts();
       final trips = await _svc.getMyTrips();
       final active = await _svc.getActiveTrip();
+      final liveSnapshot = NavigationSessionService.instance.currentSnapshot;
       final latest = active == null
           ? null
           : await _svc.getLatestTripPing(active['id']);
@@ -83,11 +85,17 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
             NavigationSessionService.instance.activateRoute(
               routes.first,
               initialLocation: current,
+              destinationName:
+                  active['destination_name']?.toString() ??
+                  'Active SafeRoute Trip',
             );
           }
         } catch (_) {
           // Use the direct start/end line when routing is unavailable.
         }
+      } else if (liveSnapshot != null) {
+        current = liveSnapshot.currentLocation;
+        routePoints = liveSnapshot.route.points;
       } else {
         try {
           final position = await LocationService.currentPosition();
@@ -106,7 +114,7 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
         _latestPing = latest;
         _currentPos = current;
         _routePoints = routePoints;
-        _routeHazards = active == null
+        _routeHazards = (active == null && liveSnapshot == null)
             ? const []
             : _hazardsNearRoute(routePoints, hazards).take(5).toList();
         _loading = false;
@@ -114,6 +122,8 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
 
       if (active != null) {
         _listenToActiveTrip(active['id'].toString());
+        _startDeviceTracking();
+      } else if (liveSnapshot != null) {
         _startDeviceTracking();
       }
     } catch (error) {
@@ -164,11 +174,11 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
     _positionSub = LocationService.positionStream().listen(
       (position) async {
         final tripId = _activeTrip?['id']?.toString();
-        if (tripId == null) return;
         final speedKmh = (position.speed * 3.6).clamp(0, 300).toDouble();
         final point = LatLng(position.latitude, position.longitude);
         if (mounted) setState(() => _currentPos = point);
         NavigationSessionService.instance.updateWithLocation(point);
+        if (tripId == null) return;
         await _svc.sendLocationPing(
           tripId: tripId,
           lat: point.latitude,
@@ -242,6 +252,54 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
         destinationText,
         proximity: start,
       );
+      final routes = await MapboxService.instance.directions(
+        start: start,
+        end: destination.point,
+      );
+      final activeHazards = await _svc.getActiveHazards();
+      final routePoints = routes.isEmpty
+          ? <LatLng>[start, destination.point]
+          : routes.first.points;
+      final routeHazards = _hazardsNearRoute(
+        routePoints,
+        activeHazards,
+      ).take(5).toList();
+      if (!_svc.isSignedIn) {
+        final route = routes.isEmpty
+            ? NavigationRoute(
+                id: 'guest-route',
+                durationMinutes: 0,
+                distanceKm: 0,
+                points: routePoints,
+              )
+            : routes.first;
+        NavigationSessionService.instance.activateRoute(
+          route,
+          initialLocation: start,
+          destinationName: destination.label,
+          routeLabel: 'Guardian Route',
+          nearbyHazards: routeHazards,
+        );
+        _startDeviceTracking();
+        if (!mounted) return;
+        setState(() {
+          _activeTrip = null;
+          _latestAnalysis = null;
+          _latestPing = null;
+          _currentPos = start;
+          _routePoints = routePoints;
+          _routeHazards = routeHazards;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Guest guardian tracking started locally. Sign in to sync guardians and SOS backup.',
+            ),
+            backgroundColor: Color(0xFF1D4ED8),
+          ),
+        );
+        return;
+      }
       final trip = await _svc.startTrip(
         startLat: start.latitude,
         startLng: start.longitude,
@@ -278,7 +336,23 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
 
   Future<void> _endTrip() async {
     final trip = _activeTrip;
-    if (trip == null) return;
+    if (trip == null) {
+      await _positionSub?.cancel();
+      NavigationSessionService.instance.clear();
+      if (!mounted) return;
+      setState(() {
+        _currentPos = null;
+        _routePoints = const [];
+        _routeHazards = const [];
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Guest trip ended.'),
+          backgroundColor: Color(0xFF059669),
+        ),
+      );
+      return;
+    }
     setState(() => _tripLoading = true);
     try {
       await _svc.endTrip(trip['id'].toString());
@@ -322,18 +396,24 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
             ),
             onPressed: () async {
               Navigator.pop(context);
-              await _svc.triggerSOS(
-                lat: point.latitude,
-                lng: point.longitude,
-                tripId: _activeTrip?['id']?.toString(),
-              );
+              if (_svc.isSignedIn) {
+                await _svc.triggerSOS(
+                  lat: point.latitude,
+                  lng: point.longitude,
+                  tripId: _activeTrip?['id']?.toString(),
+                );
+              }
               NavigationSessionService.instance.markEmergencyActive();
               await _load();
               if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('SOS sent.'),
-                  backgroundColor: Color(0xFFEF4444),
+                SnackBar(
+                  content: Text(
+                    _svc.isSignedIn
+                        ? 'SOS sent.'
+                        : 'Guest SOS marked locally. Sign in to sync emergency alerts to Supabase.',
+                  ),
+                  backgroundColor: const Color(0xFFEF4444),
                 ),
               );
             },
@@ -348,6 +428,12 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
   }
 
   Future<void> _addContact() async {
+    if (!_svc.isSignedIn) {
+      _showGuestOnlyMessage(
+        'Sign in to save guardian contacts and share trips with them.',
+      );
+      return;
+    }
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
     await showDialog<void>(
@@ -409,11 +495,21 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
   }
 
   Future<void> _deleteContact(String id) async {
+    if (!_svc.isSignedIn) {
+      _showGuestOnlyMessage('Sign in to manage guardian contacts.');
+      return;
+    }
     await _svc.deleteEmergencyContact(id);
     await _load();
   }
 
   Future<void> _reportHazard() async {
+    if (!_svc.isSignedIn) {
+      _showGuestOnlyMessage(
+        'Sign in to sync hazard reports with the community feed.',
+      );
+      return;
+    }
     final point = _currentPos;
     if (point == null) return;
     final descriptionCtrl = TextEditingController();
@@ -561,7 +657,11 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
 
   String _tripTitle() {
     final trip = _activeTrip;
-    if (trip == null) return 'No active trip';
+    if (trip == null) {
+      final liveSnapshot = NavigationSessionService.instance.currentSnapshot;
+      if (liveSnapshot != null) return 'To ${liveSnapshot.destinationName}';
+      return 'No active trip';
+    }
     final destination = trip['destination_name']?.toString();
     return destination == null || destination.isEmpty
         ? 'Active SafeRoute Trip'
@@ -595,8 +695,17 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
   double? _distanceLeftKm() {
     final trip = _activeTrip;
     final current = _currentPos;
-    if (trip == null || current == null) return null;
-    return _distance.as(LengthUnit.Kilometer, current, _tripEnd(trip));
+    if (current == null) return null;
+    if (trip != null) {
+      return _distance.as(LengthUnit.Kilometer, current, _tripEnd(trip));
+    }
+    final liveSnapshot = NavigationSessionService.instance.currentSnapshot;
+    if (liveSnapshot == null || liveSnapshot.route.points.isEmpty) return null;
+    return _distance.as(
+      LengthUnit.Kilometer,
+      current,
+      liveSnapshot.route.points.last,
+    );
   }
 
   String _etaText() {
@@ -615,7 +724,85 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
     if (_routeHazards.any((hazard) => hazard['hazard_type'] == 'lighting')) {
       return 'Lighting Alert';
     }
+    if (_activeTrip == null &&
+        NavigationSessionService.instance.currentSnapshot != null) {
+      return 'Local';
+    }
     return _activeTrip == null ? '--' : 'Good';
+  }
+
+  Future<void> _openExpandedGuardianMap() {
+    final current = _currentPos ?? const LatLng(12.9716, 77.5946);
+    final liveSnapshot = NavigationSessionService.instance.currentSnapshot;
+    final routeLines = <FullscreenMapRouteLine>[
+      if (_routePoints.length >= 2)
+        FullscreenMapRouteLine(
+          points: _routePoints,
+          color: liveSnapshot?.isEmergencyActive == true
+              ? const Color(0xFFEF4444)
+              : const Color(0xFF3B82F6),
+          strokeWidth: 6,
+        ),
+    ];
+    final markers = <FullscreenMapMarkerData>[
+      if (liveSnapshot != null && liveSnapshot.route.points.isNotEmpty)
+        FullscreenMapMarkerData(
+          point: liveSnapshot.route.points.first,
+          color: const Color(0xFF2563EB),
+          icon: Icons.flag_rounded,
+        ),
+      if (liveSnapshot != null && liveSnapshot.route.points.isNotEmpty)
+        FullscreenMapMarkerData(
+          point: liveSnapshot.route.points.last,
+          color: const Color(0xFFEF4444),
+          icon: Icons.location_on_rounded,
+        ),
+      FullscreenMapMarkerData(
+        point: current,
+        color: const Color(0xFF10B981),
+        icon: Icons.navigation_rounded,
+        size: 48,
+      ),
+      ..._routeHazards.map(
+        (hazard) => FullscreenMapMarkerData(
+          point: LatLng(
+            (hazard['lat'] as num).toDouble(),
+            (hazard['lng'] as num).toDouble(),
+          ),
+          color: const Color(0xFFF59E0B),
+          icon: Icons.warning_amber_rounded,
+          size: 40,
+        ),
+      ),
+    ];
+    return Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FullscreenRouteMapScreen(
+          title: 'Guardian Map',
+          subtitle: _tripTitle(),
+          initialCenter: current,
+          initialCameraFit: _routePoints.length >= 2
+              ? CameraFit.bounds(
+                  bounds: LatLngBounds.fromPoints(_routePoints),
+                  padding: const EdgeInsets.all(36),
+                  maxZoom: 16,
+                )
+              : null,
+          routeLines: routeLines,
+          markers: markers,
+        ),
+      ),
+    );
+  }
+
+  void _showGuestOnlyMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFF1D4ED8),
+      ),
+    );
   }
 
   @override
@@ -625,7 +812,7 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
         NavigationSessionService.instance.currentInstruction;
     final nextInstruction = NavigationSessionService.instance.nextInstruction;
     final emergencyActive = liveSnapshot?.isEmergencyActive ?? false;
-    final tripActive = _activeTrip != null;
+    final tripActive = _activeTrip != null || liveSnapshot != null;
     final current = _currentPos ?? const LatLng(12.9716, 77.5946);
     final distanceLeft = _distanceLeftKm();
 
@@ -741,11 +928,43 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
                               ),
                           ],
                         ),
+                        if (liveSnapshot != null) ...[
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              _GuardianTimerChip(
+                                startedAt: liveSnapshot.startedAt,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  liveSnapshot.routeLabel ??
+                                      liveSnapshot.destinationName,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF64748B),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Expand map',
+                                onPressed: _openExpandedGuardianMap,
+                                icon: const Icon(
+                                  Icons.open_in_full_rounded,
+                                  color: Color(0xFF334155),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(14),
                           child: SizedBox(
-                            height: 260,
+                            height: 320,
                             child: FlutterMap(
                               mapController: _mapCtrl,
                               options: MapOptions(
@@ -772,7 +991,9 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
                                   markers: [
                                     if (tripActive)
                                       Marker(
-                                        point: _tripStart(_activeTrip!),
+                                        point: _activeTrip != null
+                                            ? _tripStart(_activeTrip!)
+                                            : liveSnapshot!.route.points.first,
                                         width: 40,
                                         height: 40,
                                         child: const _MapPin(
@@ -782,7 +1003,9 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
                                       ),
                                     if (tripActive)
                                       Marker(
-                                        point: _tripEnd(_activeTrip!),
+                                        point: _activeTrip != null
+                                            ? _tripEnd(_activeTrip!)
+                                            : liveSnapshot!.route.points.last,
                                         width: 40,
                                         height: 40,
                                         child: const _MapPin(
@@ -901,10 +1124,15 @@ class _TabGuardianScreenState extends State<TabGuardianScreen> {
                               children: [
                                 _TripStat(
                                   'Start',
-                                  _formatTime(_activeTrip!['created_at']),
+                                  _activeTrip == null
+                                      ? 'Now'
+                                      : _formatTime(_activeTrip!['created_at']),
                                 ),
                                 _vDivider(),
-                                _TripStat('Taken', _takenDuration()),
+                                _TripStat(
+                                  'Taken',
+                                  _activeTrip == null ? '--' : _takenDuration(),
+                                ),
                                 _vDivider(),
                                 _TripStat(
                                   'Left',
@@ -1448,6 +1676,34 @@ class _TripStat extends StatelessWidget {
         ),
       ),
     ],
+  );
+}
+
+class _GuardianTimerChip extends StatelessWidget {
+  final DateTime startedAt;
+
+  const _GuardianTimerChip({required this.startedAt});
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder<int>(
+    stream: Stream<int>.periodic(const Duration(seconds: 1), (tick) => tick),
+    initialData: 0,
+    builder: (context, _) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
+      child: Text(
+        formatElapsedJourneyTime(DateTime.now().difference(startedAt)),
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF1D4ED8),
+        ),
+      ),
+    ),
   );
 }
 

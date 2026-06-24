@@ -22,7 +22,11 @@ void main() {
 
   test('navigation session marks emergency active and clears it', () {
     final service = NavigationSessionService();
-    service.activateRoute(_route(), initialLocation: _route().points.first);
+    service.activateRoute(
+      _route(),
+      initialLocation: _route().points.first,
+      destinationName: 'MG Road',
+    );
 
     service.markEmergencyActive();
     expect(service.currentSnapshot?.isEmergencyActive, isTrue);
